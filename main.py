@@ -1,9 +1,11 @@
-from TOKEN import TOKEN
+
 from botapitamtam import BotHandler
-#simple bot that prints миу in dialogs and find мяу and миу in chat's messages
+from token_file import token
 
-bot = BotHandler(TOKEN)
+bot = BotHandler(token)
 
+greeting_text = "Здравствуйте! \n Я бот для авторов каналов, для начала работы добавьте меня в свой канал."
+ask_for_perms_text = "В данный момент у бота нет доступа ко всем сообщениям чата. Пожалуйста, измените настройки бота."
 
 def main():
     while True:
@@ -11,14 +13,23 @@ def main():
         if upd:
             chat_id = bot.get_chat_id(upd)
             chat_info = bot.get_chat(chat_id)
+            upd_type = bot.get_update_type(upd)
             if not chat_info:
                 continue
-            update_type = bot.get_update_type(upd)
-            if(update_type == 'bot_started'):
-                if (chat_info['type'] == 'dialog'):
-                    bot.send_message('Добрый день, {}, добавьте меня в канал или начните настройку прямо здесь.'.format({bot.get_chat(chat_id)['dialog_with_user']['name']}), chat_id)
-                    continue
-            bot.get_chat_membership(chat_id)
+            elif chat_info['type'] == 'channel':
+                print("...")  # тут будет код
+            else:
+                if upd_type == "bot_started":
+                    bot.send_message(greeting_text, chat_id)
+                elif upd_type == "message_created":
+                    text = bot.get_text(upd)
+                    bot.send_message(text, chat_id)  # здесь будут команды в диалоге
+                if chat_info['type'] == 'chat':
+                    if bot.get_chat_membership(chat_id)['is_admin'] is False:
+                        bot.send_message(ask_for_perms_text, chat_id)
+                    elif 'read_all_messages' not in bot.get_chat_membership(chat_id)['permissions']:
+                        bot.send_message(ask_for_perms_text, chat_id)
+
 
 if __name__ == '__main__':
     try:
