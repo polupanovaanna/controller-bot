@@ -13,17 +13,12 @@ def main():
             chat_info = bot.get_chat(chat_id)
             if not chat_info:
                 continue
-            if (chat_info['type'] == 'dialog'):
-                bot.send_message("Миу!", chat_id)
-                continue
-            text = bot.get_text(upd)
-            if not text:
-                continue
-            if 'миу' in text.lower():
-                bot.send_message("Миу!", chat_id)
-            elif 'мяу' in text.lower():
-                bot.send_message("Не мяу, а миу!!!", chat_id)
-
+            update_type = bot.get_update_type(upd)
+            if(update_type == 'bot_started'):
+                if (chat_info['type'] == 'dialog'):
+                    bot.send_message('Добрый день, {}, добавьте меня в канал или начните настройку прямо здесь.'.format({bot.get_chat(chat_id)['dialog_with_user']['name']}), chat_id)
+                    continue
+            bot.get_chat_membership(chat_id)
 
 if __name__ == '__main__':
     try:
