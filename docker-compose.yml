@@ -1,0 +1,24 @@
+version: '3'
+services:
+  controller-bot:
+    build: ./bot/
+    container_name: "mycontroller_bot"
+    links:
+        - database
+    volumes:         
+        - database-data:/var/lib/postgresql/data/
+
+  database:
+    image: "postgres" # use latest official postgres version
+    build: ./database
+    container_name: database
+    restart: always
+    ports:
+        - "80:80"
+    env_file:
+      - database.env # configure postgres
+    volumes:
+      - database-data:/var/lib/postgresql/data/
+volumes:
+  database-data:
+  
