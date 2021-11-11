@@ -12,7 +12,7 @@ services:
     image: "postgres" # use latest official postgres version
     build: ./database
     container_name: database
-    restart: always
+    tty: true
     ports:
         - "80:80"
     env_file:

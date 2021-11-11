@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 service postgresql start
-sudo -u postgres psql
+/bin/bash
+psql --username=unicorn_user --dbname=rainbow_database

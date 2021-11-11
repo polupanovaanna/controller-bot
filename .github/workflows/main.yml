@@ -26,7 +26,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./
-          file: ./Dockerfile
+          file: ./bot/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/tamtam_author_chanell_bot_token:latest
 
