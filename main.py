@@ -5,22 +5,8 @@ from text import greeting_text, ask_for_perms_text, create_poll_intro, create_po
 bot = BotHandler(token)
 
 
-def set_channel(chat_id):
-    chats = bot.get_all_chats()
-    channels = []
-    for chat in chats['chats']:
-        if chat['type'] == 'channel':
-            channels.append(chat)
-    return channels[0]['chat_id']
-
-
-def create_poll(chat_id, channel_id):
-    positions = []
-    bot.send_message(create_poll_intro, chat_id)
-    upd = bot.get_updates()
-    poll_text_main = bot.get_text(upd)
-    number_of_ans = 0
-    bot.send_message(create_poll_ask_num, chat_id)
+def get_integer(chat_id):
+    number_of_ans = -1
     while 1:
         upd = bot.get_updates()
         text = bot.get_text(upd)
@@ -30,12 +16,40 @@ def create_poll(chat_id, channel_id):
             bot.send_message("Неправильно введено число. Попробуйте еще раз.", chat_id)
 
         if number_of_ans > 0:
-            break
+            return number_of_ans
         else:
             bot.send_message("Неправильно введено число. Попробуйте еще раз.", chat_id)
 
+
+def set_channel(chat_id):
+    chats = bot.get_all_chats()
+    channels = []
+    for chat in chats['chats']:
+        if chat['type'] == 'channel':
+            channels.append(chat)
+    if len(channels) == 0:
+        bot.send_message("Бот пока что не состоит ни в одном канале.", chat_id)
+    elif len(channels) > 0:
+        msg = "Выберите канал, с которым вы ходите работать:\n"
+        i = 1
+        for ch in channels:
+            msg += (str(i) + ". " + ch['title'] + "\n")
+        bot.send_message(msg, chat_id)
+        num = get_integer(chat_id)
+        return channels[num - 1]['chat_id']
+    return channels[0]['chat_id']
+
+
+def create_poll(chat_id, channel_id):
+    positions = []
+    bot.send_message(create_poll_intro, chat_id)
+    upd = bot.get_updates()
+    poll_text_main = bot.get_text(upd)
+    bot.send_message(create_poll_ask_num, chat_id)
+    number_of_ans = get_integer(chat_id)
+
     for i in range(number_of_ans):
-        bot.send_message("Введите вариант ответа №" + str(i+1), chat_id)
+        bot.send_message("Введите вариант ответа №" + str(i + 1), chat_id)
         upd = bot.get_updates()
         text = bot.get_text(upd)
         positions.append(text)
@@ -79,7 +93,7 @@ def main():
                     if text == "\create_poll":
                         create_poll(chat_id, channel_id)
                         bot.get_updates()
-                        #opened_polls.update(bot.get_message_id(channel_id))
+                        # opened_polls.update(bot.get_message_id(channel_id))
                     else:
                         bot.send_message("Ваша команда не распознана", chat_id)  # здесь будут команды в диалоге
                 if chat_info['type'] == 'chat':
