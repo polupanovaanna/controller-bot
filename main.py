@@ -1,8 +1,21 @@
+from random import randint
+
 from botapitamtam import BotHandler
 from token_file import token
 from text import greeting_text, ask_for_perms_text, create_poll_intro, create_poll_ask_num
 
 bot = BotHandler(token)
+opened_polls = {}
+
+
+class Poll:
+    def __init__(self):
+        self.id = None
+        self.poll_name = None
+        self.answers = []
+
+    def add(self, name):
+        self.answers.append([name, 0])
 
 
 def get_integer(chat_id):
@@ -48,27 +61,73 @@ def create_poll(chat_id, channel_id):
     bot.send_message(create_poll_ask_num, chat_id)
     number_of_ans = get_integer(chat_id)
 
+    poll_id = randint(0, 100000)
+    pl = Poll()
+    pl.id = poll_id
+    pl.poll_name = poll_text_main
+
     for i in range(number_of_ans):
         bot.send_message("Введите вариант ответа №" + str(i + 1), chat_id)
         upd = bot.get_updates()
         text = bot.get_text(upd)
         positions.append(text)
+        pl.add(text)
 
+    opened_polls[str(poll_id)] = pl
     buttons = []
+    i = 1
     for var in positions:
-        buttons.append(bot.button_callback(var, "pushed", intent='default'))
+        buttons.append(bot.button_callback(var, str(poll_id) + "~~" + str(i), intent='default'))
+        i += 1
     bot.send_message(poll_text_main, channel_id, attachments=bot.attach_buttons(buttons))
     return
 
 
-def poll_callback(callback_id):
+def close_poll(chat_id):
+    msg = "Выберите, какой опрос вы хотите закрыть:\n"
+    i = 1
+    tmp = []
+    for poll in opened_polls:
+        msg += ("№" + str(i) + ". " + opened_polls[poll].poll_name + "\n")
+        i += 1
+        tmp.append(poll)
+    msg += "Обратите внимание, что после закрытия по опросу нельзя будет получить статистику"
+    bot.send_message(msg, chat_id)
+    num = get_integer(chat_id)
+    del opened_polls[tmp[num-1]]
+    bot.send_message("Опрос был закрыт", chat_id)
+
+
+def get_poll_statistics(chat_id):
+    msg = "Выберите, по какому опросу вы хотите получить статистику:\n"
+    i = 1
+    tmp = []
+    for poll in opened_polls:
+        msg += ("№" + str(i) + ". " + opened_polls[poll].poll_name + "\n")
+        i += 1
+        tmp.append(poll)
+    bot.send_message(msg, chat_id)
+    num = get_integer(chat_id)
+    msg = "Варианты:\n"
+    i = 1
+    for v in opened_polls[tmp[num-1]].answers:
+        msg += ("\"" + v[0] + "\": получено " + str(v[1]) + " голосов\n")
+    bot.send_message(msg, chat_id)
+
+
+def poll_callback(callback_id, callback_payload):
     bot.send_answer_callback(callback_id, "Ваш голос засчитан")
+    fst_part = callback_payload.split("~~")[0]
+    snd_part = callback_payload.split("~~")[1]
+    if fst_part in opened_polls:
+        opened_polls[fst_part].answers[int(snd_part)-1][1] += 1
+    else:
+        bot.send_answer_callback(callback_id, "Опрос закрыт")
     return
 
 
 def main():
     channel_id = -1
-    opened_polls = set()
 
     while True:
         upd = bot.get_updates()
@@ -84,16 +143,19 @@ def main():
                 continue
             elif chat_info['type'] == 'channel':
                 if upd_type == "message_callback":
-                    poll_callback(bot.get_callback_id(upd))
+                    poll_callback(bot.get_callback_id(upd), bot.get_payload(upd))
             else:
                 if upd_type == "bot_started":
                     bot.send_message(greeting_text, chat_id)
                 elif upd_type == "message_created":
                     text = bot.get_text(upd)
-                    if text == "\create_poll":
+                    if text == "/create_poll":
                         create_poll(chat_id, channel_id)
                         bot.get_updates()
-                        # opened_polls.update(bot.get_message_id(channel_id))
+                    elif text == "/close_poll":
+                        close_poll(chat_id)
+                    elif text == "/poll_statistics":
+                        get_poll_statistics(chat_id)
                     else:
                         bot.send_message("Ваша команда не распознана", chat_id)  # здесь будут команды в диалоге
                 if chat_info['type'] == 'chat':
