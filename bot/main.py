@@ -1,6 +1,6 @@
 from botapitamtam import BotHandler
 from token_file import token
-
+from db import *
 bot = BotHandler(token)
 
 greeting_text = "Здравствуйте! \n Я бот для авторов каналов, для начала работы добавьте меня в свой канал."
@@ -32,6 +32,8 @@ def main():
 
 if __name__ == '__main__':
     try:
+        connect()
         main()
     except KeyboardInterrupt:
+        disconnect()
         exit()
