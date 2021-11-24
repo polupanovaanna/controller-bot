@@ -9,7 +9,13 @@ def create_poll_info():
     cur.execute(
         "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, poll_name varchar, answers varchar ARRAY, voted integer ARRAY);")
 
-
+def debug():
+    conn.commit()
+    cur.execute("SELECT * FROM poll_info;")
+    row = cur.fetchone()
+    while(row is not None):
+        print(row)
+        row = cur.fetchone()
 def convert_poll_results(answers_):
     answers = '{'
     voted = '{'
@@ -25,12 +31,11 @@ def add_poll(id: int, name: str, answers_):
     answers, voted = convert_poll_results(answers_)
     cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted) VALUES (%s, %s, %s, %s);",
                 (id, name, answers, voted))
-    cur.execute("SELECT * FROM poll_info;")
-    print(cur.fetchone())
 
 def update_votes(id: int, name : str, answers_):
     answers, voted = convert_poll_results(answers_)
-    cur.execute("UPDATE poll_info SET voted = {}) WHERE id={};".format(voted, id))
-
+    cur.execute("UPDATE poll_info SET voted = \'{}\' WHERE id={};".format(voted, id))
+    conn.commit()
+debug()
 cur.close()
 conn.close()
