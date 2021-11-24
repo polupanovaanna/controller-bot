@@ -1,8 +1,12 @@
 import psycopg2
+cur = None
+conn = None
 
-conn = psycopg2.connect("dbname=mydb user=megaserg01 password=123")
-conn.autocommit = True
-cur = conn.cursor()
+def connect():
+    global conn, cur
+    conn = psycopg2.connect("dbname=mydb user=megaserg01 password=123")
+    conn.autocommit = True
+    cur = conn.cursor()
 
 
 def create_poll_info():
@@ -10,12 +14,12 @@ def create_poll_info():
         "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, poll_name varchar, answers varchar ARRAY, voted integer ARRAY);")
 
 def debug():
-    conn.commit()
     cur.execute("SELECT * FROM poll_info;")
     row = cur.fetchone()
     while(row is not None):
         print(row)
         row = cur.fetchone()
+
 def convert_poll_results(answers_):
     answers = '{'
     voted = '{'
@@ -35,7 +39,8 @@ def add_poll(id: int, name: str, answers_):
 def update_votes(id: int, name : str, answers_):
     answers, voted = convert_poll_results(answers_)
     cur.execute("UPDATE poll_info SET voted = \'{}\' WHERE id={};".format(voted, id))
+
+def disconnect():
     conn.commit()
-debug()
-cur.close()
-conn.close()
+    cur.close()
+    conn.close()
