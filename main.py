@@ -1,9 +1,12 @@
 from random import randint
 
-from botapitamtam import BotHandler
+import requests
+
+from botapitamtam import BotHandler, logger
 from token_file import token
 from text import greeting_text, ask_for_perms_text, create_poll_intro, create_poll_ask_num
 
+url = 'https://botapi.tamtam.chat/'
 bot = BotHandler(token)
 opened_polls = {}
 
@@ -16,6 +19,35 @@ class Poll:
 
     def add(self, name):
         self.answers.append([name, 0])
+
+
+class Post:
+    def __init__(self):
+        self.id = None
+        self.time_created = None
+        self.views = []  # добавляем раз в день просмотры, расчет по формуле происходит
+
+
+def get_all_messages(channel_id):
+    method = 'messages'
+    params = (
+        ('access_token', token),
+        ('chat_id', channel_id),
+        # ('from', int64), потом эти поля будут нужны для запросов
+        # ('to', int64),
+        # ('count', int64),
+    )
+    try:
+        response = requests.get(url + method, params)
+        if response.status_code == 200:
+            messages = response.json()
+        else:
+            logger.error("Error get chat info: {}".format(response.status_code))
+            messages = None
+    except Exception as e:
+        logger.error("Error connect get chat info: %s.", e)
+        chat = None
+    return messages
 
 
 def get_integer(chat_id):
@@ -51,6 +83,10 @@ def set_channel(chat_id):
         num = get_integer(chat_id)
         return channels[num - 1]['chat_id']
     return channels[0]['chat_id']
+
+
+def get_channel_statistics(channel_id):
+
 
 
 def create_poll(chat_id, channel_id):
@@ -94,7 +130,7 @@ def close_poll(chat_id):
     msg += "Обратите внимание, что после закрытия по опросу нельзя будет получить статистику"
     bot.send_message(msg, chat_id)
     num = get_integer(chat_id)
-    del opened_polls[tmp[num-1]]
+    del opened_polls[tmp[num - 1]]
     bot.send_message("Опрос был закрыт", chat_id)
 
 
@@ -110,7 +146,7 @@ def get_poll_statistics(chat_id):
     num = get_integer(chat_id)
     msg = "Варианты:\n"
     i = 1
-    for v in opened_polls[tmp[num-1]].answers:
+    for v in opened_polls[tmp[num - 1]].answers:
         msg += ("\"" + v[0] + "\": получено " + str(v[1]) + " голосов\n")
     bot.send_message(msg, chat_id)
 
@@ -120,7 +156,7 @@ def poll_callback(callback_id, callback_payload):
     fst_part = callback_payload.split("~~")[0]
     snd_part = callback_payload.split("~~")[1]
     if fst_part in opened_polls:
-        opened_polls[fst_part].answers[int(snd_part)-1][1] += 1
+        opened_polls[fst_part].answers[int(snd_part) - 1][1] += 1
     else:
         bot.send_answer_callback(callback_id, "Опрос закрыт")
     return
