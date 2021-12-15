@@ -1,4 +1,5 @@
 from random import randint
+from datetime import datetime
 
 import requests
 
@@ -9,6 +10,12 @@ from text import greeting_text, ask_for_perms_text, create_poll_intro, create_po
 url = 'https://botapi.tamtam.chat/'
 bot = BotHandler(token)
 opened_polls = {}
+posts = {}  # dict: {channel_id, {timestamp, Post[]}}
+
+commands = [{"name": '/create_poll', "description": "Создание опроса"},
+            {"name": '/close_poll', "description": "Закрытие опроса"},
+            {"name": '/poll_statistics', "description": "Результаты опроса"},
+            {"name": '/get_posts_statistics', "description": "Получить статистику по постам"}]
 
 
 class Poll:
@@ -28,15 +35,30 @@ class Post:
         self.views = []  # добавляем раз в день просмотры, расчет по формуле происходит
 
 
-def get_all_messages(channel_id):
+def convert_date_to_ms(date):
+    dt_obj = datetime.strptime(date,
+                               '%d.%m.%Y %H:%M:%S,%f')  # '20.12.2016 09:38:42,76' - формат даты
+    ms = dt_obj.timestamp() * 1000
+    return ms
+
+
+def convert_ms_to_date(ms):
+    date = datetime.fromtimestamp(ms // 1000)
+    return date
+
+
+def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50):
+    messages = []
     method = 'messages'
-    params = (
+    params_0 = [
         ('access_token', token),
-        ('chat_id', channel_id),
-        # ('from', int64), потом эти поля будут нужны для запросов
-        # ('to', int64),
-        # ('count', int64),
-    )
+        ('chat_id', channel_id)]
+    if date_begin:
+        params_0.append(('from', convert_date_to_ms(date_begin)))
+    if date_end:
+        params_0.append(('to', convert_date_to_ms(date_end)))
+    params_0.append(('count', num_of_posts))
+    params = tuple(params_0)
     try:
         response = requests.get(url + method, params)
         if response.status_code == 200:
@@ -85,8 +107,27 @@ def set_channel(chat_id):
     return channels[0]['chat_id']
 
 
-def get_channel_statistics(channel_id):
+def update_channel_statistics(channel_id):
+    messages = get_all_messages(channel_id)
+    for msg in messages:
+        if msg['timestamp'] in posts[channel_id]:
+            posts[channel_id][msg['timestamp']].views.append(
+                1)  # тут вообще все дальше это запросы к бд кажется что код на питоне имеет мало смысла
 
+
+def get_channel_statistics(channel_id, date_begin=None, date_end=None, num_of_posts=50):
+    messages = get_all_messages(channel_id, date_begin, date_end, num_of_posts)
+    # обратиться к бд, получить статистику по запросу, вернуть массив
+    return messages
+
+
+def get_posts_statistics(channel_id, chat_id):
+    bot_msg = "Для того, чтобы получить статистику по просмотрам, выберите даты первого и последнего поста в выборке:"
+    # база данных
+    bot.send_message(bot_msg, chat_id)
+    # принять два числа и опять бд
+    messages = get_channel_statistics(channel_id, 1, 2, 50)
+    # вызвать функцию рисования графика
 
 
 def create_poll(chat_id, channel_id):
@@ -192,6 +233,8 @@ def main():
                         close_poll(chat_id)
                     elif text == "/poll_statistics":
                         get_poll_statistics(chat_id)
+                    elif text == "/get_posts_statistics":
+                        get_posts_statistics(channel_id, chat_id)
                     else:
                         bot.send_message("Ваша команда не распознана", chat_id)  # здесь будут команды в диалоге
                 if chat_info['type'] == 'chat':
