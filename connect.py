@@ -14,23 +14,23 @@ cur = conn.cursor()
 
 def create_post_stat():
     cur.execute(
-        "CREATE TABLE post_stat (timestamp integer PRIMARY KEY NOT NULL, "
-        "time integer ARRAY, views integer ARRAY);")
+        "CREATE TABLE post_stat2 (timestamp integer PRIMARY KEY NOT NULL, "
+        "time integer, views integer);")
 
 
 def add_post(timestamp: int, views: int):
-    cur.execute("INSERT INTO post_stat (timestamp, time, views) VALUES (%s, %s, %s);",
-                (timestamp, [tm()], [views]))
+    cur.execute("INSERT INTO post_stat2 (timestamp, time, views) VALUES (%s, %s, %s);",
+                (timestamp, tm(), views))
 
 
-def update_post(timestamp: int, views: int):
-    cur.execute(f"SELECT * from post_stat WHERE timestamp={timestamp};")
-    rows = cur.fetchone()
-    rows[1].append(int(tm()))
-    rows[2].append(views)
-    cur.execute("UPDATE post_stat SET time = \'{}\', views = \'{}\' WHERE timestamp={};".format(str(rows[1]).replace('[','{').replace(']','}'),
-                                                                                         str(rows[2]).replace('[','{').replace(']','}'),
-                                                                                                timestamp))
+# def update_post(timestamp: int, views: int):
+    #cur.execute(f"SELECT * from post_stat WHERE timestamp={timestamp};")
+    #rows = cur.fetchone()
+    #rows[1].append(int(tm()))
+    #rows[2].append(views)
+    #cur.execute("UPDATE post_stat SET time = \'{}\', views = \'{}\' WHERE timestamp={};".format(str(rows[1]).replace('[','{').replace(']','}'),
+                                                                                         #str(rows[2]).replace('[','{').replace(']','}'),
+                                                                                                #timestamp))
 
 
 def create_poll_info():
@@ -69,7 +69,9 @@ def update_votes(id: int, name: str, answers_):
 if __name__ == "__main__":
     # update_votes(15, "name", [('ans', 14),('ans', 14),('ans', 14)])
     # exit(0)
-    update_post(15, 20)
+    create_post_stat()
+    add_post(5843, 15)
 
-cur.close()
-conn.close()
+def close():
+    cur.close()
+    conn.close()
