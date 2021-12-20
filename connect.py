@@ -34,6 +34,9 @@ def add_post(timestamp: int, views: int):
 
 
 def create_poll_info():
+    """
+    Create table for poll.
+    """
     cur.execute(
         "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, "
         "poll_name varchar, answers varchar ARRAY, voted integer ARRAY);")
@@ -51,7 +54,11 @@ def convert_poll_results(answers_):
 
 
 def add_poll(id: int, name: str, answers_):
-    # answers_ : [[answer, voted], ...]
+    """
+    Call on create poll.
+
+    answers_ : [[answer, voted], ...]
+    """
     answers, voted = convert_poll_results(answers_)
 
     cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted) VALUES (%s, %s, %s, %s);",
@@ -71,9 +78,15 @@ def update_votes(id: int, index: int):
     cur.execute("SELECT * FROM poll_info WHERE id={};".format(id))
     print(cur.fetchone())
 
+
 def close():
     cur.close()
     conn.close()
+
+def get_poll_statistics_db(id: int):
+    cur.execute("SELECT * FROM poll_info WHERE id={};".format(id))
+    res = cur.fetchone()
+    return list(zip(res[2], res[3]))
 
 if __name__ == "__main__":
     # update_votes(15, "name", [('ans', 14),('ans', 14),('ans', 14)])
@@ -82,5 +95,6 @@ if __name__ == "__main__":
     # add_post(5843, 15)
     # add_poll(23432, "test", [['dfas', 0], ['fdk', 0]])
     update_votes(23432, 0)
+    print(func(23432))
     close()
 
