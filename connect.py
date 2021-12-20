@@ -61,17 +61,26 @@ def add_poll(id: int, name: str, answers_):
     print(answers)
 
 
-def update_votes(id: int, name: str, answers_):
-    answers, voted = convert_poll_results(answers_)
+def update_votes(id: int, index: int):
+    cur.execute("SELECT * FROM poll_info WHERE id = {};".format(id))
+    res = cur.fetchone()
+    voted = res[3]
+    voted[index] += 1
+    voted = str(voted).replace('[', '{').replace(']', '}')
     cur.execute("UPDATE poll_info SET voted = \'{}\' WHERE id={};".format(voted, id))
-
-
-if __name__ == "__main__":
-    # update_votes(15, "name", [('ans', 14),('ans', 14),('ans', 14)])
-    # exit(0)
-    create_post_stat()
-    add_post(5843, 15)
+    cur.execute("SELECT * FROM poll_info WHERE id={};".format(id))
+    print(cur.fetchone())
 
 def close():
     cur.close()
     conn.close()
+
+if __name__ == "__main__":
+    # update_votes(15, "name", [('ans', 14),('ans', 14),('ans', 14)])
+    # exit(0)
+    # create_post_stat()
+    # add_post(5843, 15)
+    # add_poll(23432, "test", [['dfas', 0], ['fdk', 0]])
+    update_votes(23432, 0)
+    close()
+
