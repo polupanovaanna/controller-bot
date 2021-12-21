@@ -146,6 +146,19 @@ def get_poll_statistics_db(id: int):
     res = cur.fetchone()
     return list(zip(res[2], res[3]))
 
+def get_all_polls():
+    """
+    Return [(id: int, name: str), ...]
+    """
+    cur.exeecute(f"SELECT id, name FROM poll_info WHERE closed=FALSE;")
+
+    tmp = cur.fetchone()
+    res = []
+    while tmp != None:
+        res.append(tmp)
+        res = cur.fetchone()
+    return res
+
 if __name__ == "__main__":
     # add_poll(12, 'name', [['fds', 0], ['dssa', 0]])
     create_post_stat()
