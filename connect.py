@@ -29,14 +29,35 @@ def add_post(timestamp: int, views: int):
     """
     cur.execute("INSERT INTO post_stat (timestamp, time, views) VALUES (%s, %s, %s);",
                 (timestamp, tm(), views))
+    
+
+def get_post_stat_by_day_db(id: int):
+    """
+    Give id and u will get get max of views in each weak.
+    """
+    return get_post_stat_by_db(id, 'day')
+
+
+def get_post_stat_by_weak_db(id: int):
+    """
+    Give id and u will get get max of views in each weak.
+    """
+    return get_post_stat_by_db(id, 'weak')
 
 
 def get_post_stat_by_month_db(id: int):
     """
     Give id and u will get get max of views in each mounth.
     """
+    return get_post_stat_by_db(id, 'month')
 
-    cur.execute(f"SELECT DATE_TRUNC('month',to_timestamp(time)::date) AS month, MAX(views) AS views_sum FROM post_stat GROUP BY month;")
+
+def get_post_stat_by_db(id: int, wtf: str):
+    """
+    Private function to not copy paste.
+    """
+
+    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, MAX(views) AS views_sum FROM post_stat GROUP BY month;")
 
 
     res = []
