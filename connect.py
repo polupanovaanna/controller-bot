@@ -69,24 +69,13 @@ def get_post_stat_by_db(id: int, wtf: str):
     return res
 
 
-
-# def update_post(timestamp: int, views: int):
-    #cur.execute(f"SELECT * from post_stat WHERE timestamp={timestamp};")
-    #rows = cur.fetchone()
-    #rows[1].append(int(tm()))
-    #rows[2].append(views)
-    #cur.execute("UPDATE post_stat SET time = \'{}\', views = \'{}\' WHERE timestamp={};".format(str(rows[1]).replace('[','{').replace(']','}'),
-                                                                                         #str(rows[2]).replace('[','{').replace(']','}'),
-                                                                                                #timestamp))
-
-
 def create_poll_info():
     """
     Create table for poll.
     """
     cur.execute(
         "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, "
-        "poll_name varchar, answers varchar ARRAY, voted integer ARRAY);")
+        "poll_name varchar, answers varchar ARRAY, voted integer ARRAY, closed boolean);")
 
 
 def convert_poll_results(answers_):
@@ -112,9 +101,9 @@ def add_poll(id: int, name: str, answers_):
     """
     answers, voted = convert_poll_results(answers_)
 
-    cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted) VALUES (%s, %s, %s, %s);",
+    cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed) VALUES (%s, %s, %s, %s, FALSE);",
                 (id, name, answers, voted))
-    cur.execute("SELECT * FROM poll_info;")
+    #cur.execute("SELECT * FROM poll_info;")
 
 
 def update_votes(id: int, index: int):
@@ -123,11 +112,15 @@ def update_votes(id: int, index: int):
     """
     cur.execute("SELECT * FROM poll_info WHERE id = {};".format(id))
     res = cur.fetchone()
+
+    if res[4]:
+        return False
+
     voted = res[3]
     voted[index] += 1
     voted = str(voted).replace('[', '{').replace(']', '}')
     cur.execute("UPDATE poll_info SET voted = \'{}\' WHERE id={};".format(voted, id))
-    cur.execute("SELECT * FROM poll_info WHERE id={};".format(id))
+    return True
 
 
 def close():
@@ -143,7 +136,7 @@ def close_poll(id: int):
     Finaly close poll.
     No chance to open.
     """
-    pass
+    cur.execute("UPDATE poll_info SET closed = TRUE WHERE id={};".format(id))
 
 def get_poll_statistics_db(id: int):
     """
@@ -154,14 +147,8 @@ def get_poll_statistics_db(id: int):
     return list(zip(res[2], res[3]))
 
 if __name__ == "__main__":
-    print(get_post_stat_by_month_db(321))
-    #add_post(321, 17)
-    # update_votes(15, "name", [('ans', 14),('ans', 14),('ans', 14)])
-    # exit(0)
-    # create_post_stat()
-    # add_post(5843, 15)
-    # add_poll(23432, "test", [['dfas', 0], ['fdk', 0]])
-    # update_votes(23432, 0)
-    # print(func(23432))
-    # close()
+    # add_poll(12, 'name', [['fds', 0], ['dssa', 0]])
+    close_poll(12)
+    print(update_votes(12, 1))
+    close()
 
