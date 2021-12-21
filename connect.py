@@ -1,4 +1,3 @@
-# TODO check is poll closed
 import psycopg2
 from config import host, user, password, db_name
 from time import time as tm
@@ -130,7 +129,6 @@ def close():
     cur.close()
     conn.close()
 
-#TODO
 def db_close_poll(id: int):
     """
     Finaly close poll.
@@ -156,12 +154,13 @@ def get_all_polls():
     res = []
     while tmp is not None:
         res.append(tmp)
-        res = cur.fetchone()
+        tmp = cur.fetchone()
     return res
 
 if __name__ == "__main__":
     # add_poll(12, 'name', [['fds', 0], ['dssa', 0]])
-    create_post_stat()
-    create_poll_info()
+    print(get_all_polls())
+    #create_post_stat()
+    #create_poll_info()
     close()
 
