@@ -2,10 +2,11 @@ from random import randint
 from datetime import datetime
 
 import requests
+from connect import *
 
 from botapitamtam import BotHandler, logger
 from token_file import token
-from text import greeting_text, ask_for_perms_text, create_poll_intro, create_poll_ask_num
+from text import *
 
 url = 'https://botapi.tamtam.chat/'
 bot = BotHandler(token)
@@ -15,7 +16,8 @@ posts = {}  # dict: {channel_id, {timestamp, Post[]}}
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
             {"name": '/close_poll', "description": "Закрытие опроса"},
             {"name": '/poll_statistics', "description": "Результаты опроса"},
-            {"name": '/get_posts_statistics', "description": "Получить статистику по постам"}]
+            {"name": '/get_posts_statistics', "description": "Получить статистику по постам"},
+            {"name": '/clear_members', "description": "Удалить неактивных участников канала"}]
 
 
 class Poll:
@@ -72,6 +74,27 @@ def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50
     return messages
 
 
+def get_all_channel_members(channel_id, marker=None):
+    method = 'chats/{}'.format(channel_id) + '/members'
+    params = {
+        "access_token": token,
+        "count": 100
+    }
+    if marker:
+        params["marker"] = marker
+    try:
+        response = requests.get(url + method, params=params)
+        if response.status_code == 200:
+            members = response.json()
+        else:
+            logger.error("Error get members: {}".format(response.status_code))
+            members = None
+    except Exception as e:
+        logger.error("Error connect get members: %s.", e)
+        members = None
+    return members
+
+
 def get_integer(chat_id):
     number_of_ans = -1
     while 1:
@@ -110,14 +133,18 @@ def set_channel(chat_id):
 def update_channel_statistics(channel_id):
     messages = get_all_messages(channel_id)
     for msg in messages:
-        if msg['timestamp'] in posts[channel_id]:
-            posts[channel_id][msg['timestamp']].views.append(
-                1)  # тут вообще все дальше это запросы к бд кажется что код на питоне имеет мало смысла
+        add_post(msg['timestamp'], msg['stat']['views'])
 
 
-def get_channel_statistics(channel_id, date_begin=None, date_end=None, num_of_posts=50):
-    messages = get_all_messages(channel_id, date_begin, date_end, num_of_posts)
-    # обратиться к бд, получить статистику по запросу, вернуть массив
+def get_channel_statistics(chat_id, channel_id, num_of_posts=100):
+    messages = get_all_messages(channel_id, num_of_posts)
+    bot_msg = "Выберите, статистику за какой промежуток вы хотите получить:\n 1. Последний день\n" \
+              "2. Последняя неделя\n" \
+              "3. Последний месяц\n"
+    bot.send_message(bot_msg, chat_id)
+    variant = get_integer(chat_id)
+    if variant == 1:
+        get_post_stat_by_day_db()
     return messages
 
 
@@ -131,7 +158,6 @@ def get_posts_statistics(channel_id, chat_id):
 
 
 def create_poll(chat_id, channel_id):
-    positions = []
     bot.send_message(create_poll_intro, chat_id)
     upd = bot.get_updates()
     poll_text_main = bot.get_text(upd)
@@ -139,28 +165,30 @@ def create_poll(chat_id, channel_id):
     number_of_ans = get_integer(chat_id)
 
     poll_id = randint(0, 100000)
-    pl = Poll()
-    pl.id = poll_id
-    pl.poll_name = poll_text_main
+
+    answers = []
 
     for i in range(number_of_ans):
         bot.send_message("Введите вариант ответа №" + str(i + 1), chat_id)
         upd = bot.get_updates()
         text = bot.get_text(upd)
-        positions.append(text)
-        pl.add(text)
+        answers.append([text, 0])
 
-    opened_polls[str(poll_id)] = pl
+    add_poll(poll_id, poll_text_main, answers)
     buttons = []
     i = 1
-    for var in positions:
-        buttons.append(bot.button_callback(var, str(poll_id) + "~~" + str(i), intent='default'))
+    for var in answers:
+        buttons.append(bot.button_callback(var[0], str(poll_id) + "~~" + str(i), intent='default'))
         i += 1
     bot.send_message(poll_text_main, channel_id, attachments=bot.attach_buttons(buttons))
     return
 
 
 def close_poll(chat_id):
+    if len(opened_polls) == 0:
+        msg = "В данный момент в канале нет открытых опросов\n"
+        bot.send_message(msg, chat_id)
+        return
     msg = "Выберите, какой опрос вы хотите закрыть:\n"
     i = 1
     tmp = []
@@ -203,8 +231,29 @@ def poll_callback(callback_id, callback_payload):
     return
 
 
+def clear_channel_followers(chat_id, channel_id):
+    bot.send_message("Укажите, какое время (в днях) пользователь должен быть не активным, чтобы быть удаленным ботом",
+                     chat_id)
+    duration = get_integer(chat_id)
+    members = get_all_channel_members(channel_id)
+    while True:
+        if members is None:
+            break
+        for mem in members['members']:
+            print("ура")
+            if int(datetime.now().timestamp() * 1000) - duration * 24 * 60 * 60 * 1000 > mem['last_activity_time']:
+                bot.remove_member(channel_id, mem['user_id'])
+        if 'marker' not in members:
+            break
+        else:
+            members = get_all_channel_members(channel_id, marker=members['marker'])
+
+    bot.send_message("Пользователи были удалены", chat_id)
+
+
 def main():
     channel_id = -1
+    bot.edit_bot_info("TESTbot", commands=commands)
 
     while True:
         upd = bot.get_updates()
@@ -235,6 +284,8 @@ def main():
                         get_poll_statistics(chat_id)
                     elif text == "/get_posts_statistics":
                         get_posts_statistics(channel_id, chat_id)
+                    elif text == "/clear_members":
+                        clear_channel_followers(chat_id, channel_id)
                     else:
                         bot.send_message("Ваша команда не распознана", chat_id)  # здесь будут команды в диалоге
                 if chat_info['type'] == 'chat':
@@ -247,5 +298,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+        close()
     except KeyboardInterrupt:
         exit()
