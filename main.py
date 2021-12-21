@@ -10,7 +10,6 @@ from text import *
 
 url = 'https://botapi.tamtam.chat/'
 bot = BotHandler(token)
-opened_polls = {}
 posts = {}  # dict: {channel_id, {timestamp, Post[]}}
 
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
@@ -104,6 +103,7 @@ def get_integer(chat_id):
             number_of_ans = int(text)
         except ValueError:
             bot.send_message("Неправильно введено число. Попробуйте еще раз.", chat_id)
+            continue
 
         if number_of_ans > 0:
             return number_of_ans
@@ -185,6 +185,7 @@ def create_poll(chat_id, channel_id):
 
 
 def close_poll(chat_id):
+    opened_polls = get_all_polls()
     if len(opened_polls) == 0:
         msg = "В данный момент в канале нет открытых опросов\n"
         bot.send_message(msg, chat_id)
@@ -193,13 +194,12 @@ def close_poll(chat_id):
     i = 1
     tmp = []
     for poll in opened_polls:
-        msg += ("№" + str(i) + ". " + opened_polls[poll].poll_name + "\n")
+        msg += ("№" + str(i) + ". " + poll[1] + "\n")
         i += 1
-        tmp.append(poll)
     msg += "Обратите внимание, что после закрытия по опросу нельзя будет получить статистику"
     bot.send_message(msg, chat_id)
     num = get_integer(chat_id)
-    del opened_polls[tmp[num - 1]]
+    db_close_poll(opened_polls[num - 1][0])
     bot.send_message("Опрос был закрыт", chat_id)
 
 
@@ -207,26 +207,26 @@ def get_poll_statistics(chat_id):
     msg = "Выберите, по какому опросу вы хотите получить статистику:\n"
     i = 1
     tmp = []
+    opened_polls = get_all_polls()
     for poll in opened_polls:
-        msg += ("№" + str(i) + ". " + opened_polls[poll].poll_name + "\n")
+        msg += ("№" + str(i) + ". " + poll['name'] + "\n")
         i += 1
-        tmp.append(poll)
     bot.send_message(msg, chat_id)
     num = get_integer(chat_id)
     msg = "Варианты:\n"
     i = 1
-    for v in opened_polls[tmp[num - 1]].answers:
+    for v in get_poll_statistics_db(opened_polls[num-1][0]):
         msg += ("\"" + v[0] + "\": получено " + str(v[1]) + " голосов\n")
     bot.send_message(msg, chat_id)
 
 
 def poll_callback(callback_id, callback_payload):
+    opened_polls = get_all_polls()
     bot.send_answer_callback(callback_id, "Ваш голос засчитан")
-    fst_part = callback_payload.split("~~")[0]
-    snd_part = callback_payload.split("~~")[1]
-    if fst_part in opened_polls:
-        opened_polls[fst_part].answers[int(snd_part) - 1][1] += 1
-    else:
+    poll_id = callback_payload.split("~~")[0]
+    num = callback_payload.split("~~")[1]
+    rs = update_votes(poll_id, num)
+    if rs is False:
         bot.send_answer_callback(callback_id, "Опрос закрыт")
     return
 

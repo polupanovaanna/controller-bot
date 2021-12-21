@@ -131,7 +131,7 @@ def close():
     conn.close()
 
 #TODO
-def close_poll(id: int):
+def db_close_poll(id: int):
     """
     Finaly close poll.
     No chance to open.
@@ -150,11 +150,11 @@ def get_all_polls():
     """
     Return [(id: int, name: str), ...]
     """
-    cur.exeecute(f"SELECT id, name FROM poll_info WHERE closed=FALSE;")
+    cur.execute(f"SELECT id, poll_name FROM poll_info WHERE closed=FALSE;")
 
     tmp = cur.fetchone()
     res = []
-    while tmp != None:
+    while tmp is not None:
         res.append(tmp)
         res = cur.fetchone()
     return res
