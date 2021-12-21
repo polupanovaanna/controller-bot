@@ -148,7 +148,7 @@ def get_poll_statistics_db(id: int):
 
 if __name__ == "__main__":
     # add_poll(12, 'name', [['fds', 0], ['dssa', 0]])
-    close_poll(12)
-    print(update_votes(12, 1))
+    create_post_stat()
+    create_poll_info()
     close()
 
