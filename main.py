@@ -143,18 +143,17 @@ def get_channel_statistics(chat_id, channel_id, num_of_posts=100):
               "3. Последний месяц\n"
     bot.send_message(bot_msg, chat_id)
     variant = get_integer(chat_id)
-    if variant == 1:
-        get_post_stat_by_day_db()
-    return messages
-
-
-def get_posts_statistics(channel_id, chat_id):
-    bot_msg = "Для того, чтобы получить статистику по просмотрам, выберите даты первого и последнего поста в выборке:"
-    # база данных
-    bot.send_message(bot_msg, chat_id)
-    # принять два числа и опять бд
-    messages = get_channel_statistics(channel_id, 1, 2, 50)
-    # вызвать функцию рисования графика
+    for msg in messages:
+        if variant == 1:
+            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(get_post_stat_by_day_db(msg['id'])) + " просмотров\n"
+            bot.send_message(bot_msg, chat_id)
+        if variant == 2:
+            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(get_post_stat_by_week_db(msg['id'])) + " просмотров\n"
+            bot.send_message(bot_msg, chat_id)
+        if variant == 3:
+            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(get_post_stat_by_month_db(msg['id'])) + " просмотров\n"
+            bot.send_message(bot_msg, chat_id)
+    # ну а вот графика пока нет, потому что я не умею получать по датам из базы данных
 
 
 def create_poll(chat_id, channel_id):
@@ -209,14 +208,14 @@ def get_poll_statistics(chat_id):
     tmp = []
     opened_polls = get_all_polls()
     for poll in opened_polls:
-        msg += ("№" + str(i) + ". " + poll['name'] + "\n")
+        msg += ("№" + str(i) + ". " + str(poll[1]) + "\n")
         i += 1
     bot.send_message(msg, chat_id)
     num = get_integer(chat_id)
     msg = "Варианты:\n"
     i = 1
     for v in get_poll_statistics_db(opened_polls[num-1][0]):
-        msg += ("\"" + v[0] + "\": получено " + str(v[1]) + " голосов\n")
+        msg += ("\"" + str(v[0]) + "\": получено " + str(v[1]) + " голосов\n")
     bot.send_message(msg, chat_id)
 
 
@@ -262,15 +261,14 @@ def main():
             chat_info = bot.get_chat(chat_id)
             upd_type = bot.get_update_type(upd)
 
-            if channel_id == -1:
-                channel_id = set_channel(chat_id)
-
             if not chat_info:
                 continue
             elif chat_info['type'] == 'channel':
                 if upd_type == "message_callback":
                     poll_callback(bot.get_callback_id(upd), bot.get_payload(upd))
             else:
+                if channel_id == -1:
+                    channel_id = set_channel(chat_id)
                 if upd_type == "bot_started":
                     bot.send_message(greeting_text, chat_id)
                 elif upd_type == "message_created":
@@ -282,8 +280,8 @@ def main():
                         close_poll(chat_id)
                     elif text == "/poll_statistics":
                         get_poll_statistics(chat_id)
-                    elif text == "/get_posts_statistics":
-                        get_posts_statistics(channel_id, chat_id)
+                    elif text == "/get_channel_statistics":
+                        get_channel_statistics(channel_id, chat_id)
                     elif text == "/clear_members":
                         clear_channel_followers(chat_id, channel_id)
                     else:

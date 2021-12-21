@@ -2,7 +2,6 @@ import psycopg2
 from config import host, user, password, db_name
 from time import time as tm
 
-
 conn = psycopg2.connect(
     host=host,
     user=user,
@@ -28,25 +27,25 @@ def add_post(timestamp: int, views: int):
     """
     cur.execute("INSERT INTO post_stat (timestamp, time, views) VALUES (%s, %s, %s);",
                 (timestamp, tm(), views))
-    
+
 
 def get_post_stat_by_day_db(id: int):
     """
-    Give id and u will get get max of views in each weak.
+    Needs post id, returns post views last day.
     """
     return get_post_stat_by_db(id, 'day')
 
 
-def get_post_stat_by_weak_db(id: int):
+def get_post_stat_by_week_db(id: int):
     """
-    Give id and u will get get max of views in each weak.
+     Needs post id, returns post views last week.
     """
-    return get_post_stat_by_db(id, 'weak')
+    return get_post_stat_by_db(id, 'week')
 
 
 def get_post_stat_by_month_db(id: int):
     """
-    Give id and u will get get max of views in each mounth.
+    Needs post id, returns post views last month.
     """
     return get_post_stat_by_db(id, 'month')
 
@@ -56,8 +55,8 @@ def get_post_stat_by_db(id: int, wtf: str):
     Private function to not copy paste.
     """
 
-    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, MAX(views) AS views_sum FROM post_stat GROUP BY month;")
-
+    cur.execute(
+        f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, MAX(views) AS views_sum FROM post_stat GROUP BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -102,7 +101,7 @@ def add_poll(id: int, name: str, answers_):
 
     cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed) VALUES (%s, %s, %s, %s, FALSE);",
                 (id, name, answers, voted))
-    #cur.execute("SELECT * FROM poll_info;")
+    # cur.execute("SELECT * FROM poll_info;")
 
 
 def update_votes(id: int, index: int):
@@ -116,7 +115,7 @@ def update_votes(id: int, index: int):
         return False
 
     voted = res[3]
-    voted[index] += 1
+    voted[int(index) - 1] += 1
     voted = str(voted).replace('[', '{').replace(']', '}')
     cur.execute("UPDATE poll_info SET voted = \'{}\' WHERE id={};".format(voted, id))
     return True
@@ -129,12 +128,14 @@ def close():
     cur.close()
     conn.close()
 
+
 def db_close_poll(id: int):
     """
-    Finaly close poll.
+    Finally closes poll.
     No chance to open.
     """
     cur.execute("UPDATE poll_info SET closed = TRUE WHERE id={};".format(id))
+
 
 def get_poll_statistics_db(id: int):
     """
@@ -143,6 +144,7 @@ def get_poll_statistics_db(id: int):
     cur.execute(f"SELECT * FROM poll_info WHERE id={id};")
     res = cur.fetchone()
     return list(zip(res[2], res[3]))
+
 
 def get_all_polls():
     """
@@ -157,10 +159,10 @@ def get_all_polls():
         tmp = cur.fetchone()
     return res
 
+
 if __name__ == "__main__":
     # add_poll(12, 'name', [['fds', 0], ['dssa', 0]])
     print(get_all_polls())
-    #create_post_stat()
-    #create_poll_info()
+    # create_post_stat()
+    # create_poll_info()
     close()
-
