@@ -1,0 +1,19 @@
+version: '3'
+services:
+  controller-bot:
+    build: ./bot/
+    container_name: "controller_bot_ok"
+  database:
+    image: "bitnami/postgresql:13.3.0-debian-10-r47" # use latest official postgres version
+    container_name: database
+    environment:
+      - POSTGRESQL_DATABASE=database
+      - ALLOW_EMPTY_PASSWORD=yes
+      - POSTGRESQL_PASSWORD=pass
+    ports:
+        - "5432"
+    volumes:
+      - database-data:/var/lib/postgresql/data/
+volumes:
+  database-data:
+  

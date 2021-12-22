@@ -6,7 +6,8 @@ from connect import *
 
 from botapitamtam import BotHandler, logger
 from token_file import token
-from text import *
+from db import *
+from text import greeting_text, ask_for_perms_text, create_poll_intro, create_poll_ask_num
 
 url = 'https://botapi.tamtam.chat/'
 bot = BotHandler(token)
@@ -24,7 +25,6 @@ class Poll:
         self.id = None
         self.poll_name = None
         self.answers = []
-
     def add(self, name):
         self.answers.append([name, 0])
 
@@ -295,7 +295,9 @@ def main():
 
 if __name__ == '__main__':
     try:
+        connect()
         main()
         close()
     except KeyboardInterrupt:
+        disconnect()
         exit()
