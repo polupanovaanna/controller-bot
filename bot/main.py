@@ -14,7 +14,6 @@ class Poll:
         self.id = None
         self.poll_name = None
         self.answers = []
-
     def add(self, name):
         self.answers.append([name, 0])
 
