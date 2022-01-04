@@ -3,7 +3,7 @@ import time
 
 cur = None
 conn = None
-table_name = "mentions_info777"
+table_name = "mentions_info034"
 
 
 def connect():
@@ -18,7 +18,7 @@ def create_spider_db():
         f"CREATE TABLE {table_name} (channel_id bigint PRIMARY KEY NOT NULL, last_checked_message bigint , first_checked_message bigint , mentions integer);")
 
 
-def add_channel(channel_id, time=int(time.time())):
+def add_channel(channel_id, time):
     try:
         cur.execute(
             f"INSERT INTO {table_name} (channel_id, last_checked_message, first_checked_message, mentions) values (%s, %s, %s, %s);",
@@ -35,7 +35,8 @@ def add_mention(channel_id):
             "UPDATE {} SET mentions = {} where channel_id={};".format(table_name, int(current_mentions[0]) + 1,
                                                                       channel_id))
     except:
-        add_channel(channel_id)
+        pass
+
 
 def get_last_time(channel_id):
     cur.execute(f"SELECT  last_checked_message from {table_name} where channel_id={channel_id}")
@@ -46,13 +47,16 @@ def get_first_time(channel_id):
     cur.execute(f"SELECT  first_checked_message from {table_name} where channel_id={channel_id}")
     return cur.fetchone()
 
+
 def set_last_time(channel_id, time):
     cur.execute("UPDATE {} SET last_checked_message = {} where channel_id={};".format(table_name, time, channel_id))
     conn.commit()
 
+
 def set_first_time(channel_id, time):
     cur.execute("UPDATE {} SET first_checked_message = {} where channel_id={};".format(table_name, time, channel_id))
     conn.commit()
+
 
 def disconnect():
     conn.commit()
@@ -67,7 +71,10 @@ def get_all_chats():
         return res
     return []
 
+
 def get_mentions(chat_id):
     cur.execute("SELECT mentions from {} where channel_id={}".format(table_name, chat_id))
+
+
 connect()
-#create_spider_db()
+create_spider_db()
