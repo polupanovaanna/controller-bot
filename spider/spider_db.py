@@ -3,7 +3,7 @@ import time
 
 cur = None
 conn = None
-table_name = "mentions_info034"
+table_name = "mentions_info044"
 
 
 def connect():
@@ -65,8 +65,9 @@ def disconnect():
 
 
 def get_all_chats():
+    conn.commit()
     cur.execute(f"SELECT channel_id from {table_name}")
-    res = cur.fetchone()
+    res = cur.fetchall()
     if (res is not None):
         return res
     return []
@@ -77,4 +78,4 @@ def get_mentions(chat_id):
 
 
 connect()
-create_spider_db()
+#create_spider_db()

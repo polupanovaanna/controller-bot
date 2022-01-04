@@ -6,10 +6,8 @@ import spider_db
 import re
 import queue
 
-delta_time = 4002352240
 message_count = 100
 visited_channels = set()  # set(spider_db.get_all_chats())
-channels_queue = queue.Queue()
 
 
 def get_chat_id(link):
@@ -53,11 +51,13 @@ def dfs(chat_link):
     last_time = 0
     first_time = 0
     print("started")
+    print(spider_db.get_all_chats())
     if current_chat_id not in set(spider_db.get_all_chats()):
         last_time = get_last_message_time(current_chat_id)
         spider_db.set_last_time(current_chat_id, last_time)
         spider_db.set_first_time(current_chat_id, 0)
         print("channel is new")
+        spider_db.add_channel(current_chat_id, last_time)
     else:
         first_time = spider_db.get_last_time(current_chat_id)
         print("channel is old")
@@ -67,8 +67,8 @@ def dfs(chat_link):
     while need_check and len(messages) > 0:
         for message in messages:
             timestamp = message["timestamp"]
-            last_time = min(timestamp, last_time-10000)
-            print(last_time)
+            last_time = min(timestamp, last_time-10)
+            #print(last_time)
             if (timestamp <= first_time):
                 need_check = False
                 break
@@ -84,6 +84,8 @@ def dfs(chat_link):
                         add_mention(i[1])
                         if (get_chat_id(i[1]) not in visited_channels):
                             channels_queue.put(i[1])
+                            print(i[1])
+        print(last_time)
         messages = get_chat_messages(chat_link, last_time)
     if spider_db.get_first_time(current_chat_id) == 0:
         spider_db.set_first_time(current_chat_id, last_time)
@@ -98,25 +100,29 @@ def get_params(chat_id, last_time):
         "from": last_time,
         "count": message_count
     }
-    print(params)
+    #print(params)
     return params
 
 
 def get_chat_messages(link: str, last_time: int):
     # try:
     chat = requests.get(f"https://botapi.tamtam.chat/chats/{link}", params={"access_token": token}).json()
-    print(chat)
+    #print(chat)
     if (not chat["is_public"]):
         return []
     chat_id = chat["chat_id"]
 
     params = get_params(chat_id, last_time)
     response = requests.get("https://botapi.tamtam.chat/messages", params=params)
-    print(len(response.json()["messages"]))
+    #print(response.json()["messages"])
+    #exit(0)
     return response.json()["messages"]
 
 
-#get_last_message_time(get_chat_id("shootki"))
+#print(get_last_message_time(get_chat_id("mytestchannel")))
 
-dfs("shootki")
+channels_queue = queue.Queue()
+dfs("mytestchannel")
 print(spider_db.get_all_chats())
+#1638363924221
+#1641330600753
