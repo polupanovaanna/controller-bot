@@ -8,25 +8,53 @@ conn = psycopg2.connect(
     password=password,
     database=db_name
 )
+
 conn.autocommit = True
 cur = conn.cursor()
 
 
 def create_post_stat():
     """
+    Private
     Call to create table for posts.
     """
     cur.execute(
         "CREATE TABLE post_stat (timestamp integer, "
-        "time integer, views integer);")
+        "time integer, views integer, message_id integer);")
 
 
-def add_post(timestamp: int, views: int):
+def add_post(timestamp: int, views: int, message_id: int, chat_id: int):
     """
     Add's note about post at this moment.
     """
-    cur.execute("INSERT INTO post_stat (timestamp, time, views) VALUES (%s, %s, %s);",
-                (timestamp, tm(), views))
+
+    cur.execute(f"SELECT SUM(views) AS view FROM post_stat WHERE message_id={message_id};")
+
+    tmp = cur.fetchone()[0]
+    if tmp is None:
+        old = 0
+        add_message(chat_id, message_id)
+    else:
+        old = int(tmp)
+
+    cur.execute("INSERT INTO post_stat (timestamp, time, views, message_id) VALUES (%s, %s, %s, %s);",
+                (timestamp, 1000000, views - old, message_id))
+
+
+def get_post_stat_from_channel(channel_id: int):
+    """
+    TODO
+    """
+    cur.execute(
+        f"SELECT DATE_TRUNC('month',to_timestamp(time)::date) AS month, MAX(views) AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.message_id=channel_post.message_id WHERE chat_id={channel_id} GROUP BY month;")
+
+    res = []
+    tmp = cur.fetchone()
+
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+    return res
 
 
 def get_post_stat_by_day_db(id: int):
@@ -50,13 +78,12 @@ def get_post_stat_by_month_db(id: int):
     return get_post_stat_by_db(id, 'month')
 
 
-def get_post_stat_by_db(id: int, wtf: str):
+def get_channel_stat_by_day_from_to(chat_id: int, fr = 0, to = 2147483647):
     """
-    Private function to not copy paste.
+    TODO
     """
-
-    cur.execute(
-        f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, MAX(views) AS views_sum FROM post_stat GROUP BY month;")
+    
+    cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.message_id=channel_post.message_id WHERE channel_post.chat_id={chat_id} AND post_stat.time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -67,10 +94,63 @@ def get_post_stat_by_db(id: int, wtf: str):
     return res
 
 
+def get_post_stat_by_day_from_to(message_id: int, fr = 0, to = 2147483647):
+    """
+    TODO
+    """
+    
+    cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id={message_id} AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
+
+    res = []
+    tmp = cur.fetchone()
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+
+    return res
+
+
+def get_post_stat_by_db(id: int, wtf: str):
+    """
+    Private function to not copy paste.
+    """
+
+    cur.execute(
+        f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, MAX(views) AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.chat_id=channel_post.chat_id GROUP BY month;")
+
+    res = []
+    tmp = cur.fetchone()
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+
+    return res
+
+
+def create_channel_to_post():
+    """
+    Private
+    Creates table from channel to post_id
+    """
+    cur.execute(
+        "CREATE TABLE channel_post (chat_id integer, "
+        "message_id integer);")
+
+
+def add_message(chat_id: int, message_id: int):
+    """
+    Private
+    Add's message
+    """
+    cur.execute("INSERT INTO channel_post (chat_id, message_id) VALUES (%s, %s)", (chat_id, message_id))
+
+
 def create_poll_info():
     """
+    Private
     Create table for poll.
     """
+
     cur.execute(
         "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, "
         "poll_name varchar, answers varchar ARRAY, voted integer ARRAY, closed boolean);")
@@ -93,6 +173,7 @@ def convert_poll_results(answers_):
 
 def add_poll(id: int, name: str, answers_):
     """
+    Private
     Call on create poll.
 
     answers_ : [[answer: str, voted: int], ...]
@@ -101,7 +182,6 @@ def add_poll(id: int, name: str, answers_):
 
     cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed) VALUES (%s, %s, %s, %s, FALSE);",
                 (id, name, answers, voted))
-    # cur.execute("SELECT * FROM poll_info;")
 
 
 def update_votes(id: int, index: int):
@@ -157,12 +237,23 @@ def get_all_polls():
     while tmp is not None:
         res.append(tmp)
         tmp = cur.fetchone()
+
     return res
+
+def create_all():
+    """
+    Create all tables
+    """
+
+    create_post_stat()
+    create_poll_info()
+    create_channel_to_post()
 
 
 if __name__ == "__main__":
-    # add_poll(12, 'name', [['fds', 0], ['dssa', 0]])
-    print(get_all_polls())
-    # create_post_stat()
-    # create_poll_info()
+    #add_post(15, 5, 0, 0)
+    print(get_post_stat_by_day_from_to(0))
+    print(get_post_stat_by_day_from_to(1))
+    print(get_channel_stat_by_day_from_to(0))
+
     close()
