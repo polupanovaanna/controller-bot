@@ -39,6 +39,7 @@ def add_post(timestamp: int, views: int, message_id: int, chat_id: int):
     cur.execute("INSERT INTO post_stat (timestamp, time, views, message_id) VALUES (%s, %s, %s, %s);",
                 (timestamp, tm(), views - old, message_id))
 
+
 def get_post_stat_by_day_db(id: int):
     """
     Needs post id, returns post views last day.
@@ -89,7 +90,6 @@ def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
     Private
     Returns count of new views between fr and to in channel, with precision wtf.
     """
-    
     cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.message_id=channel_post.message_id WHERE channel_post.chat_id={chat_id} AND post_stat.time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
@@ -99,6 +99,7 @@ def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
         tmp = cur.fetchone()
 
     return res
+
 
 def get_post_stat_by_day_from_to(message_id: int, fr = 0, to = 2147483647):
     """
@@ -126,7 +127,6 @@ def get_post_stat_from_to(message_id: int, wtf: str, fr, to):
     Private
     Returns count of new views between fr and to for post, with precision wtf.
     """
-    
     cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id={message_id} AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
@@ -142,7 +142,6 @@ def get_post_stat_by_db(id: int, wtf: str):
     """
     Private function to not copy paste.
     """
-
     cur.execute(
         f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.chat_id=channel_post.chat_id GROUP BY month;")
 
@@ -178,7 +177,6 @@ def create_poll_info():
     Private
     Create table for poll.
     """
-
     cur.execute(
         "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, "
         "poll_name varchar, answers varchar ARRAY, voted integer ARRAY, closed boolean);")
@@ -189,7 +187,6 @@ def create_poll_voted():
     Private
     Create table for voted.
     """
-
     cur.execute(
         "CREATE TABLE poll_voted (user_id integer, "
         "name varchar, id integer, index integer);")
@@ -200,7 +197,6 @@ def who_voted(id: int, index: int):
     Returns array of voted for this answer.
     [(user_id: int, name: str)]
     """
-
     cur.execute(f"SELECT user_id, name FROM poll_voted WHERE id={id} AND index={index}")
 
     res = []
@@ -223,7 +219,6 @@ def add_vote(chel_id: int, name: str, poll_id: int, index: int):
     Private
     Mark chel as voted.
     """
-
     cur.execute("INSERT INTO poll_voted (user_id, name, id, index) VALUES (%s, %s, %s, %s);",
                 (chel_id, name, poll_id, index))
 
@@ -249,7 +244,6 @@ def add_poll(id: int, name: str, answers_):
 
     answers_ : [[answer: str, voted: int], ...]
     """
-
     answers, voted = convert_poll_results(answers_)
 
     cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed) VALUES (%s, %s, %s, %s, FALSE);",
@@ -260,7 +254,6 @@ def update_votes(id: int, index: int, chel_id: int, name: str):
     """
     Add one vote to index ans.
     """
-
     cur.execute("SELECT * FROM poll_info WHERE id = {};".format(id))
     res = cur.fetchone()
 
@@ -296,7 +289,6 @@ def get_poll_statistics_db(id: int):
     """
     Return's [[ans: str, votes: int], ...]
     """
-
     cur.execute(f"SELECT * FROM poll_info WHERE id={id};")
     res = cur.fetchone()
     return list(zip(res[2], res[3]))
@@ -306,7 +298,6 @@ def get_all_polls():
     """
     Return [(id: int, name: str), ...]
     """
-
     cur.execute(f"SELECT id, poll_name FROM poll_info WHERE closed=FALSE;")
 
     tmp = cur.fetchone()
@@ -317,11 +308,11 @@ def get_all_polls():
 
     return res
 
+
 def create_all():
     """
     Create all tables
     """
-
     create_poll_voted()
     create_post_stat()
     create_poll_info()
