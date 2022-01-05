@@ -1,4 +1,5 @@
 from random import randint
+import time
 from datetime import datetime
 
 import requests
@@ -56,7 +57,9 @@ def convert_ms_to_date(ms):
 
 
 def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50):
-
+    """
+    Получает список всех сообщений в канале через запрос
+    """
     messages = []
     method = 'messages'
     params_0 = [
@@ -169,9 +172,10 @@ def update_channel_statistics(channel_id):
     """
     messages = get_all_messages(channel_id)
     for msg in messages:
-        add_post(msg['timestamp'], msg['stat']['views'])
+        add_post(msg['timestamp'], msg['stat']['views'], msg['body'], channel_id)
 
 
+'''
 def get_channel_statistics(chat_id, channel_id, num_of_posts=100):
     """
     Получение статистики по каналу за определенный промежуток времени
@@ -196,6 +200,90 @@ def get_channel_statistics(chat_id, channel_id, num_of_posts=100):
                 get_post_stat_by_month_db(msg['id'])) + " просмотров\n"
             bot.send_message(bot_msg, chat_id)
     # ну а вот графика пока нет, потому что я не умею получать по датам из базы данных
+'''
+
+
+def get_post_statictics(chat_id, channel_id, fr, to):
+
+
+
+
+def get_channel_statistics(chat_id, channel_id):
+    msg = "Выберите, хотите вы получить статистику по всему каналу или по определенному посту"
+    buttons = [bot.button_callback("По каналу", "gcs~~channel", intent='default'),
+               bot.button_callback("По посту", "gcs~~post", intent='default'),
+               bot.button_callback("Выход", "gcs~~exit", intent='default')]
+
+    bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
+
+
+def chat_callback(chat_id, channel_id, callback_id, callback_payload):
+    command = callback_payload.split("~~")[0]
+    if len(command) == 2:
+        if command[0]== "gcs":
+            if command[1] == "channel":
+                gcs_get_stat(chat_id, channel_id, True)
+            else:
+                gcs_get_stat(chat_id, channel_id, False)
+    if len(command) == 5:
+        if command[0] == "gcstime":
+            time_gap = command[1]
+            fr = command[3]
+            to = command[4]
+            if command[2] == "ch":
+                #стата для канал
+            else:
+                #стата для поста
+
+
+def gcs_get_stat(chat_id, channel_id, is_channel):
+    """
+    is_channel true if we need channel stat else false
+    """
+    msg = "Введите одну или две даты через пробел в формате ДД.ММ.ГГГГ, например 21.02.1930 \n" \
+          "Первая дата - начало временного промежутка, вторая - конец (необязательный параметр) \n" \
+          "Если вы хотите получить статистику за все доступное боту время, введите команду skip \n" \
+          "Для выхода введите команду /exit"
+    bot.send_message(msg, chat_id)
+    upd = bot.get_updates()
+    text = bot.get_text(upd)
+    if text == "skip":
+        gcs_params(chat_id, channel_id, is_channel)
+    elif text == "exit":
+        return
+    elif len(text.split()) == 1:
+        s = text.split('.')
+        d = datetime(s[2],s[1],s[0])
+        unixtime = time.mktime(d.timetuple())
+        gcs_params(chat_id, channel_id, is_channel, int(unixtime))
+    elif len(text.split()) == 2:
+        s1 = text.split()[0].split('.')
+        s2 = text.split()[1].split('.')
+        d1 = datetime(s1[2], s1[1], s1[0])
+        d2 = datetime(s2[2], s2[1], s2[0])
+        unixtime1 = time.mktime(d1.timetuple())
+        unixtime2 = time.mktime(d2.timetuple())
+        gcs_params(chat_id, channel_id, is_channel, int(unixtime1), int(unixtime2))
+    else:
+        bot.send_message("Неправильный формат ввода", chat_id)
+
+
+def gcs_params(chat_id, channel_id, is_channel, date1=0, date2=2147483647):
+    msg = "Выберите временные отрезки, по которым вы хотите получать статистику"
+    strings = ["gcstime~~day", "gcstime~~week", "gcstime~~month"]
+    if is_channel:
+        for s in strings:
+            s += "~~ch"
+    else:
+        for s in strings:
+            s += "~~pst"
+    for s in strings:
+        s += "~~" + str(date1) + "~~" + str(date2)
+
+    buttons = [bot.button_callback("День", strings[0], intent='default'),
+               bot.button_callback("Неделя", strings[1], intent='default'),
+               bot.button_callback("Месяц", strings[2], intent='default')]
+    bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
 
 
 def create_poll(chat_id, channel_id):
