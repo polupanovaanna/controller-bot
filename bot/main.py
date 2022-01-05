@@ -6,7 +6,6 @@ from connect import *
 
 from botapitamtam import BotHandler, logger
 from token_file import token
-from db import *
 from text import greeting_text, ask_for_perms_text, create_poll_intro, create_poll_ask_num
 
 url = 'https://botapi.tamtam.chat/'
@@ -14,10 +13,11 @@ bot = BotHandler(token)
 posts = {}  # dict: {channel_id, {timestamp, Post[]}}
 
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
-            {"name": '/close_poll', "description": "Закрытие опроса"},
             {"name": '/poll_statistics', "description": "Результаты опроса"},
+            {"name": '/close_poll', "description": "Закрытие опроса"},
             {"name": '/get_posts_statistics', "description": "Получить статистику по постам"},
-            {"name": '/clear_members', "description": "Удалить неактивных участников канала"}]
+            {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
+            {"name": '/set_channel', "description": "Выбор канала для работы с ботом"}]
 
 
 class Poll:
@@ -25,6 +25,7 @@ class Poll:
         self.id = None
         self.poll_name = None
         self.answers = []
+
     def add(self, name):
         self.answers.append([name, 0])
 
@@ -37,6 +38,9 @@ class Post:
 
 
 def convert_date_to_ms(date):
+    """
+        Перевод даты в стандартном формате в формат UNIX timestamp
+     """
     dt_obj = datetime.strptime(date,
                                '%d.%m.%Y %H:%M:%S,%f')  # '20.12.2016 09:38:42,76' - формат даты
     ms = dt_obj.timestamp() * 1000
@@ -44,11 +48,15 @@ def convert_date_to_ms(date):
 
 
 def convert_ms_to_date(ms):
+    """
+    Перевод даты в формате UNIX timestamp в стандартный формат
+    """
     date = datetime.fromtimestamp(ms // 1000)
     return date
 
 
 def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50):
+
     messages = []
     method = 'messages'
     params_0 = [
@@ -111,12 +119,37 @@ def get_integer(chat_id):
             bot.send_message("Неправильно введено число. Попробуйте еще раз.", chat_id)
 
 
-def set_channel(chat_id):
+def check_user_rights(user_id, channel_id, chat_id):
+    """
+    Проверка, что пользователь является админом канала
+    Для бота работает аналогично, нужно передать, что user_id = get_bot_user_id
+    """
+    members = bot.get_chat_admins(channel_id)
+    for mem in members:
+        if mem['user_id'] == user_id:
+            return True
+    # bot.send_message("В настоящий момент вы не являетесь администратором данного канала", chat_id)
+    return False
+
+
+def set_channel(chat_id, user_id):
+    """
+    Определение канала, с которым бот будет работать.
+    Важно: пользователь должен быть админом этого канала и бот должен иметь в нём права администратора, иначе
+    канал не будет доступен для выбора.
+    """
     chats = bot.get_all_chats()
     channels = []
-    for chat in chats['chats']:
-        if chat['type'] == 'channel':
-            channels.append(chat)
+    marker = 0
+    while True:
+        for chat in chats['chats']:
+            if chat['type'] == 'channel' and check_user_rights(user_id, chat['chat_id'], chat_id) and check_user_rights(
+                    bot.get_bot_user_id(), chat['chat_id'], chat_id):
+                channels.append(chat)
+        if 'marker' not in chats or chats['marker'] is None:
+            break
+        else:
+            chats = bot.get_all_chats(marker=chats['marker'])
     if len(channels) == 0:
         bot.send_message("Бот пока что не состоит ни в одном канале.", chat_id)
     elif len(channels) > 0:
@@ -131,12 +164,18 @@ def set_channel(chat_id):
 
 
 def update_channel_statistics(channel_id):
+    """
+    Обновление статистики по всем постам в канале: запускается как фоновой процесс
+    """
     messages = get_all_messages(channel_id)
     for msg in messages:
         add_post(msg['timestamp'], msg['stat']['views'])
 
 
 def get_channel_statistics(chat_id, channel_id, num_of_posts=100):
+    """
+    Получение статистики по каналу за определенный промежуток времени
+    """
     messages = get_all_messages(channel_id, num_of_posts)
     bot_msg = "Выберите, статистику за какой промежуток вы хотите получить:\n 1. Последний день\n" \
               "2. Последняя неделя\n" \
@@ -145,18 +184,24 @@ def get_channel_statistics(chat_id, channel_id, num_of_posts=100):
     variant = get_integer(chat_id)
     for msg in messages:
         if variant == 1:
-            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(get_post_stat_by_day_db(msg['id'])) + " просмотров\n"
+            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(
+                get_post_stat_by_day_db(msg['id'])) + " просмотров\n"
             bot.send_message(bot_msg, chat_id)
         if variant == 2:
-            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(get_post_stat_by_week_db(msg['id'])) + " просмотров\n"
+            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(
+                get_post_stat_by_week_db(msg['id'])) + " просмотров\n"
             bot.send_message(bot_msg, chat_id)
         if variant == 3:
-            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(get_post_stat_by_month_db(msg['id'])) + " просмотров\n"
+            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(
+                get_post_stat_by_month_db(msg['id'])) + " просмотров\n"
             bot.send_message(bot_msg, chat_id)
     # ну а вот графика пока нет, потому что я не умею получать по датам из базы данных
 
 
 def create_poll(chat_id, channel_id):
+    """
+    Создание опроса
+    """
     bot.send_message(create_poll_intro, chat_id)
     upd = bot.get_updates()
     poll_text_main = bot.get_text(upd)
@@ -184,6 +229,9 @@ def create_poll(chat_id, channel_id):
 
 
 def close_poll(chat_id):
+    """
+    Закрытие опроса
+    """
     opened_polls = get_all_polls()
     if len(opened_polls) == 0:
         msg = "В данный момент в канале нет открытых опросов\n"
@@ -203,6 +251,9 @@ def close_poll(chat_id):
 
 
 def get_poll_statistics(chat_id):
+    """
+    Получение результатов опроса: сколько голосов за каждый вариант. По запросу можно увидеть, кто голосовал
+    """
     msg = "Выберите, по какому опросу вы хотите получить статистику:\n"
     i = 1
     tmp = []
@@ -214,12 +265,15 @@ def get_poll_statistics(chat_id):
     num = get_integer(chat_id)
     msg = "Варианты:\n"
     i = 1
-    for v in get_poll_statistics_db(opened_polls[num-1][0]):
+    for v in get_poll_statistics_db(opened_polls[num - 1][0]):
         msg += ("\"" + str(v[0]) + "\": получено " + str(v[1]) + " голосов\n")
     bot.send_message(msg, chat_id)
 
 
 def poll_callback(callback_id, callback_payload):
+    """
+    Реакция на клик пользователя по варианту ответа в опросе
+    """
     opened_polls = get_all_polls()
     bot.send_answer_callback(callback_id, "Ваш голос засчитан")
     poll_id = callback_payload.split("~~")[0]
@@ -231,6 +285,9 @@ def poll_callback(callback_id, callback_payload):
 
 
 def clear_channel_followers(chat_id, channel_id):
+    """
+    Удаление неактивных подписчиков в канале
+    """
     bot.send_message("Укажите, какое время (в днях) пользователь должен быть не активным, чтобы быть удаленным ботом",
                      chat_id)
     duration = get_integer(chat_id)
@@ -248,6 +305,13 @@ def clear_channel_followers(chat_id, channel_id):
             members = get_all_channel_members(channel_id, marker=members['marker'])
 
     bot.send_message("Пользователи были удалены", chat_id)
+
+
+# def send_timed_post(channel_id):
+
+
+# def create_timed_post(chat_id):
+# проверить, что пользователь админ
 
 
 def main():
@@ -284,8 +348,10 @@ def main():
                         get_channel_statistics(channel_id, chat_id)
                     elif text == "/clear_members":
                         clear_channel_followers(chat_id, channel_id)
+                    elif text == "/set_channel":
+                        set_channel(chat_id)
                     else:
-                        bot.send_message("Ваша команда не распознана", chat_id)  # здесь будут команды в диалоге
+                        bot.send_message("Ваша команда не распознана", chat_id)
                 if chat_info['type'] == 'chat':
                     if bot.get_chat_membership(chat_id)['is_admin'] is False:
                         bot.send_message(ask_for_perms_text, chat_id)
@@ -295,9 +361,9 @@ def main():
 
 if __name__ == '__main__':
     try:
-        connect()
+        # connect()
         main()
         close()
     except KeyboardInterrupt:
-        disconnect()
+        # disconnect()
         exit()
