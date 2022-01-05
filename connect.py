@@ -38,7 +38,7 @@ def add_post(timestamp: int, views: int, message_id: int, chat_id: int):
         old = int(tmp)
 
     cur.execute("INSERT INTO post_stat (timestamp, time, views, message_id) VALUES (%s, %s, %s, %s);",
-                (timestamp, 1000000, views - old, message_id))
+                (timestamp, tm(), views - old, message_id))
 
 
 def get_post_stat_from_channel(channel_id: int):
