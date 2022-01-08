@@ -16,7 +16,7 @@ posts = {}  # dict: {channel_id, {timestamp, Post[]}}
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
             {"name": '/poll_statistics', "description": "Результаты опроса"},
             {"name": '/close_poll', "description": "Закрытие опроса"},
-            {"name": '/get_posts_statistics', "description": "Получить статистику по постам"},
+            {"name": '/get_channel_statistics', "description": "Получить статистику по постам"},
             {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
             {"name": '/set_channel', "description": "Выбор канала для работы с ботом"}]
 
@@ -110,21 +110,23 @@ def get_fwd_message_id(update):
     return mid
 
 
-def get_integer(chat_id):
+def get_integer(chat_id, maxval):
     number_of_ans = -1
     while 1:
         upd = bot.get_updates()
         text = bot.get_text(upd)
+        if text == '/exit':
+            return None
         try:
             number_of_ans = int(text)
         except ValueError:
             bot.send_message("Неправильно введено число. Попробуйте еще раз.", chat_id)
             continue
 
-        if number_of_ans > 0:
+        if number_of_ans > 0 or number_of_ans > maxval:
             return number_of_ans
         else:
-            bot.send_message("Неправильно введено число. Попробуйте еще раз.", chat_id)
+            bot.send_message("Вы ввели число вне допустимого диапазона. Попробуйте еще раз.", chat_id)
 
 
 def check_user_rights(user_id, channel_id, chat_id):
@@ -133,7 +135,7 @@ def check_user_rights(user_id, channel_id, chat_id):
     Для бота работает аналогично, нужно передать, что user_id = get_bot_user_id
     """
     members = bot.get_chat_admins(channel_id)
-    for mem in members:
+    for mem in members['members']:
         if mem['user_id'] == user_id:
             return True
     # bot.send_message("В настоящий момент вы не являетесь администратором данного канала", chat_id)
@@ -166,7 +168,7 @@ def set_channel(chat_id, user_id):
         for ch in channels:
             msg += (str(i) + ". " + ch['title'] + "\n")
         bot.send_message(msg, chat_id)
-        num = get_integer(chat_id)
+        num = get_integer(chat_id, len(channels))
         return channels[num - 1]['chat_id']
     return channels[0]['chat_id']
 
@@ -176,14 +178,15 @@ def update_channel_statistics(channel_id):
     Обновление статистики по всем постам в канале: запускается как фоновой процесс
     """
     messages = get_all_messages(channel_id)
-    for msg in messages:
-        add_post(msg['timestamp'], msg['stat']['views'], msg['body'], channel_id)
+    for msg in messages['messages']:
+        print(msg)
+        add_post(msg['timestamp'], msg['stat']['views'], msg['body']['mid'], channel_id)
 
 
 def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
     msg = "Перешлите боту сообщение, статистику по которому необходимо получить"
     mid = None
-    while (True):
+    while True:
         upd = bot.get_updates()
         mid = get_fwd_message_id(upd)
         if mid is not None:
@@ -198,12 +201,15 @@ def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
 
 
 def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
+    update_channel_statistics(channel_id)
+    res = []
     if time_gap == "day":
         res = get_post_stat_by_day_from_to(channel_id, fr, to)
     if time_gap == "week":
         res = get_post_stat_by_week_from_to(channel_id, fr, to)
     if time_gap == "month":
         res = get_post_stat_by_month_from_to(channel_id, fr, to)
+    print(res)
     # прислать картинку
 
 
@@ -217,7 +223,8 @@ def get_channel_statistics(chat_id, channel_id):
 
 
 def chat_callback(chat_id, channel_id, callback_id, callback_payload):
-    command = callback_payload.split("~~")[0]
+    command = callback_payload.split("~~")
+    print(command)
     if len(command) == 2:
         if command[0] == "gcs":
             if command[1] == "channel":
@@ -238,6 +245,7 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
 def gcs_get_stat(chat_id, channel_id, is_channel):
     """
     is_channel true if we need channel stat else false
+    is_channel true if we need channel stat else false
     """
     msg = "Введите одну или две даты через пробел в формате ДД.ММ.ГГГГ, например 21.02.1930 \n" \
           "Первая дата - начало временного промежутка, вторая - конец (необязательный параметр) \n" \
@@ -252,14 +260,14 @@ def gcs_get_stat(chat_id, channel_id, is_channel):
         return
     elif len(text.split()) == 1:
         s = text.split('.')
-        d = datetime(s[2], s[1], s[0])
+        d = datetime(int(s[2]), int(s[1]), int(s[0]))
         unixtime = time.mktime(d.timetuple())
         gcs_params(chat_id, channel_id, is_channel, int(unixtime))
     elif len(text.split()) == 2:
         s1 = text.split()[0].split('.')
         s2 = text.split()[1].split('.')
-        d1 = datetime(s1[2], s1[1], s1[0])
-        d2 = datetime(s2[2], s2[1], s2[0])
+        d1 = datetime(int(s1[2]), int(s1[1]), int(s1[0]))
+        d2 = datetime(int(s2[2]), int(s2[1]), int(s2[0]))
         unixtime1 = time.mktime(d1.timetuple())
         unixtime2 = time.mktime(d2.timetuple())
         gcs_params(chat_id, channel_id, is_channel, int(unixtime1), int(unixtime2))
@@ -271,13 +279,13 @@ def gcs_params(chat_id, channel_id, is_channel, date1=0, date2=2147483647):
     msg = "Выберите временные отрезки, по которым вы хотите получать статистику"
     strings = ["gcstime~~day", "gcstime~~week", "gcstime~~month"]
     if is_channel:
-        for s in strings:
-            s += "~~ch"
+        for i in range(len(strings)):
+            strings[i] += "~~ch"
     else:
-        for s in strings:
-            s += "~~pst"
-    for s in strings:
-        s += "~~" + str(date1) + "~~" + str(date2)
+        for i in range(len(strings)):
+            strings[i] += "~~pst"
+    for i in range(len(strings)):
+        strings[i] += "~~" + str(date1) + "~~" + str(date2)
 
     buttons = [bot.button_callback("День", strings[0], intent='default'),
                bot.button_callback("Неделя", strings[1], intent='default'),
@@ -293,7 +301,7 @@ def create_poll(chat_id, channel_id):
     upd = bot.get_updates()
     poll_text_main = bot.get_text(upd)
     bot.send_message(create_poll_ask_num, chat_id)
-    number_of_ans = get_integer(chat_id)
+    number_of_ans = get_integer(chat_id, 10000)
 
     poll_id = randint(0, 100000)
 
@@ -332,7 +340,7 @@ def close_poll(chat_id):
         i += 1
     msg += "Обратите внимание, что после закрытия по опросу нельзя будет получить статистику"
     bot.send_message(msg, chat_id)
-    num = get_integer(chat_id)
+    num = get_integer(chat_id, len(opened_polls))
     db_close_poll(opened_polls[num - 1][0])
     bot.send_message("Опрос был закрыт", chat_id)
 
@@ -349,25 +357,37 @@ def get_poll_statistics(chat_id):
         msg += ("№" + str(i) + ". " + str(poll[1]) + "\n")
         i += 1
     bot.send_message(msg, chat_id)
-    num = get_integer(chat_id)
+    num = get_integer(chat_id, len(opened_polls))
     msg = "Варианты:\n"
     i = 1
     for v in get_poll_statistics_db(opened_polls[num - 1][0]):
         msg += ("\"" + str(v[0]) + "\": получено " + str(v[1]) + " голосов\n")
     bot.send_message(msg, chat_id)
+    msg = "Если вы хотите получить статистику по номеру варианта, введите номер варианта, иначе выберите команду " \
+          "/exit \n "
+    bot.send_message(msg, chat_id)
+    while True:
+        i = get_integer(chat_id, max)
+        if i is None:
+            break
+        stat = who_voted(opened_polls[num - 1][0], i)
+        msg = ' '
+        for i in range(len(stat) - 1):
+            msg += stat[i][1] + ', '
+        msg += stat[len(stat) - 1][1]
+        bot.send_message('За вариант №' + str(i + 1) + ' проголосовали: ' + msg, chat_id)
 
 
-def poll_callback(callback_id, callback_payload):
+def poll_callback(callback_id, callback_payload, user_id, username):
     """
     Реакция на клик пользователя по варианту ответа в опросе
     """
-    opened_polls = get_all_polls()
     bot.send_answer_callback(callback_id, "Ваш голос засчитан")
     poll_id = callback_payload.split("~~")[0]
     num = callback_payload.split("~~")[1]
-    rs = update_votes(poll_id, num)
+    rs = update_votes(poll_id, num, str(user_id), username)
     if rs is False:
-        bot.send_answer_callback(callback_id, "Опрос закрыт")
+        bot.send_answer_callback(callback_id, "Вы уже голосовали в этом опросе или опрос закрыт")
     return
 
 
@@ -377,13 +397,12 @@ def clear_channel_followers(chat_id, channel_id):
     """
     bot.send_message("Укажите, какое время (в днях) пользователь должен быть не активным, чтобы быть удаленным ботом",
                      chat_id)
-    duration = get_integer(chat_id)
+    duration = get_integer(chat_id, 1000000000)
     members = get_all_channel_members(channel_id)
     while True:
         if members is None:
             break
         for mem in members['members']:
-            print("ура")
             if int(datetime.now().timestamp() * 1000) - duration * 24 * 60 * 60 * 1000 > mem['last_activity_time']:
                 bot.remove_member(channel_id, mem['user_id'])
         if 'marker' not in members:
@@ -411,15 +430,16 @@ def main():
             chat_id = bot.get_chat_id(upd)
             chat_info = bot.get_chat(chat_id)
             upd_type = bot.get_update_type(upd)
+            user_id = bot.get_user_id(upd)
 
             if not chat_info:
                 continue
             elif chat_info['type'] == 'channel':
                 if upd_type == "message_callback":
-                    poll_callback(bot.get_callback_id(upd), bot.get_payload(upd))
+                    poll_callback(bot.get_callback_id(upd), bot.get_payload(upd), user_id, bot.get_name(upd))
             else:
                 if channel_id == -1:
-                    channel_id = set_channel(chat_id)
+                    channel_id = set_channel(chat_id, user_id)
                 if upd_type == "bot_started":
                     bot.send_message(greeting_text, chat_id)
                 elif upd_type == "message_created":
@@ -432,13 +452,15 @@ def main():
                     elif text == "/poll_statistics":
                         get_poll_statistics(chat_id)
                     elif text == "/get_channel_statistics":
-                        get_channel_statistics(channel_id, chat_id)
+                        get_channel_statistics(chat_id, channel_id)
                     elif text == "/clear_members":
                         clear_channel_followers(chat_id, channel_id)
                     elif text == "/set_channel":
-                        set_channel(chat_id)
+                        set_channel(chat_id, user_id)
                     else:
                         bot.send_message("Ваша команда не распознана", chat_id)
+                elif upd_type == 'message_callback':
+                    chat_callback(chat_id, channel_id, bot.get_callback_id(upd), bot.get_payload(upd))
                 if chat_info['type'] == 'chat':
                     if bot.get_chat_membership(chat_id)['is_admin'] is False:
                         bot.send_message(ask_for_perms_text, chat_id)
@@ -449,6 +471,7 @@ def main():
 if __name__ == '__main__':
     try:
         # connect()
+        # create_all()
         main()
         close()
     except KeyboardInterrupt:
