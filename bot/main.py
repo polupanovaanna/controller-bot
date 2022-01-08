@@ -21,23 +21,6 @@ commands = [{"name": '/create_poll', "description": "Создание опрос
             {"name": '/set_channel', "description": "Выбор канала для работы с ботом"}]
 
 
-class Poll:
-    def __init__(self):
-        self.id = None
-        self.poll_name = None
-        self.answers = []
-
-    def add(self, name):
-        self.answers.append([name, 0])
-
-
-class Post:
-    def __init__(self):
-        self.id = None
-        self.time_created = None
-        self.views = []  # добавляем раз в день просмотры, расчет по формуле происходит
-
-
 def convert_date_to_ms(date):
     """
         Перевод даты в стандартном формате в формат UNIX timestamp
@@ -103,6 +86,28 @@ def get_all_channel_members(channel_id, marker=None):
         logger.error("Error connect get members: %s.", e)
         members = None
     return members
+
+
+def get_fwd_message_id(update):
+    """
+    Дополнение к библиотеке
+    Получение id пересланного сообщения
+    :param update = результат работы метода get_update
+    :return: возвращает, если это возможно, значение поля 'mid' пересланного боту сообщения
+    """
+    mid = None
+    if update:
+        if 'updates' in update.keys():
+            upd = update['updates'][0]
+        else:
+            upd = update
+        if 'message' in upd.keys():
+            upd = upd['message']
+            if 'link' in upd.keys():
+                upd = upd['link']
+                if 'message' in upd.keys():
+                    mid = upd['message']['mid']
+    return mid
 
 
 def get_integer(chat_id):
@@ -175,37 +180,31 @@ def update_channel_statistics(channel_id):
         add_post(msg['timestamp'], msg['stat']['views'], msg['body'], channel_id)
 
 
-'''
-def get_channel_statistics(chat_id, channel_id, num_of_posts=100):
-    """
-    Получение статистики по каналу за определенный промежуток времени
-    """
-    messages = get_all_messages(channel_id, num_of_posts)
-    bot_msg = "Выберите, статистику за какой промежуток вы хотите получить:\n 1. Последний день\n" \
-              "2. Последняя неделя\n" \
-              "3. Последний месяц\n"
-    bot.send_message(bot_msg, chat_id)
-    variant = get_integer(chat_id)
-    for msg in messages:
-        if variant == 1:
-            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(
-                get_post_stat_by_day_db(msg['id'])) + " просмотров\n"
-            bot.send_message(bot_msg, chat_id)
-        if variant == 2:
-            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(
-                get_post_stat_by_week_db(msg['id'])) + " просмотров\n"
-            bot.send_message(bot_msg, chat_id)
-        if variant == 3:
-            bot_msg = "У поста от " + str(convert_ms_to_date(msg['timestamp'])) + ": " + str(
-                get_post_stat_by_month_db(msg['id'])) + " просмотров\n"
-            bot.send_message(bot_msg, chat_id)
-    # ну а вот графика пока нет, потому что я не умею получать по датам из базы данных
-'''
+def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
+    msg = "Перешлите боту сообщение, статистику по которому необходимо получить"
+    mid = None
+    while (True):
+        upd = bot.get_updates()
+        mid = get_fwd_message_id(upd)
+        if mid is not None:
+            break
+    if time_gap == "day":
+        res = get_post_stat_by_day_from_to(mid, fr, to)
+    if time_gap == "week":
+        res = get_post_stat_by_week_from_to(mid, fr, to)
+    if time_gap == "month":
+        res = get_post_stat_by_month_from_to(mid, fr, to)
+    # прислать картинку
 
 
-def get_post_statictics(chat_id, channel_id, fr, to):
-
-
+def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
+    if time_gap == "day":
+        res = get_post_stat_by_day_from_to(channel_id, fr, to)
+    if time_gap == "week":
+        res = get_post_stat_by_week_from_to(channel_id, fr, to)
+    if time_gap == "month":
+        res = get_post_stat_by_month_from_to(channel_id, fr, to)
+    # прислать картинку
 
 
 def get_channel_statistics(chat_id, channel_id):
@@ -220,7 +219,7 @@ def get_channel_statistics(chat_id, channel_id):
 def chat_callback(chat_id, channel_id, callback_id, callback_payload):
     command = callback_payload.split("~~")[0]
     if len(command) == 2:
-        if command[0]== "gcs":
+        if command[0] == "gcs":
             if command[1] == "channel":
                 gcs_get_stat(chat_id, channel_id, True)
             else:
@@ -231,9 +230,9 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
             fr = command[3]
             to = command[4]
             if command[2] == "ch":
-                #стата для канал
+                get_ch_statictics(chat_id, channel_id, time_gap, fr, to)
             else:
-                #стата для поста
+                get_post_statictics(chat_id, channel_id, time_gap, fr, to)
 
 
 def gcs_get_stat(chat_id, channel_id, is_channel):
@@ -253,7 +252,7 @@ def gcs_get_stat(chat_id, channel_id, is_channel):
         return
     elif len(text.split()) == 1:
         s = text.split('.')
-        d = datetime(s[2],s[1],s[0])
+        d = datetime(s[2], s[1], s[0])
         unixtime = time.mktime(d.timetuple())
         gcs_params(chat_id, channel_id, is_channel, int(unixtime))
     elif len(text.split()) == 2:
