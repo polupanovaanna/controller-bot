@@ -12,6 +12,15 @@ conn = psycopg2.connect(
 conn.autocommit = True
 cur = conn.cursor()
 
+def create_user_stat():
+    """
+    Private
+    Create table for users
+    """
+    cur.execute(
+        "CREATE TABLE user_stat (timestamp integer, "
+        "user_id BIGINT, chat_id integer);")
+
 
 def create_post_stat():
     """
@@ -27,7 +36,7 @@ def add_post(timestamp: int, views: int, message_id: str, chat_id: int):
     """
     Add's note about post at this moment.
     """
-    cur.execute(f"SELECT SUM(views) AS view FROM post_stat WHERE message_id={message_id};")
+    cur.execute(f"SELECT SUM(views) AS view FROM post_stat WHERE message_id='{message_id}';")
 
     tmp = cur.fetchone()[0]
     if tmp is None:
@@ -127,7 +136,7 @@ def get_post_stat_from_to(message_id: str, wtf: str, fr, to):
     Private
     Returns count of new views between fr and to for post, with precision wtf.
     """
-    cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id={message_id} AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
+    cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id='{message_id}' AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -325,8 +334,5 @@ def create_all():
     create_channel_to_post()
 
 
-# def update_votes(id: int, index: int, chel_id: int, name: str):
 if __name__ == "__main__":
-    update_votes(0, 0, 1, 'data2')
-    print(get_poll_statistics_db(0))
     close()
