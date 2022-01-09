@@ -1,6 +1,8 @@
 from random import randint
 import time
 from datetime import datetime
+import matplotlib.pyplot as plt
+import numpy as np
 
 import requests
 from connect import *
@@ -21,6 +23,12 @@ commands = [{"name": '/create_poll', "description": "Создание опрос
             {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
             {"name": '/set_channel', "description": "Выбор канала для работы с ботом"},
             {"name": '/send_timed', "description": "Отправка отложенного поста или опроса"}]
+
+
+def draw_statistics(dates, views, filename):
+    fig = plt.figure()
+    plt.plot(dates, views)
+    plt.savefig(filename)
 
 
 def convert_date_to_ms(date):
@@ -181,36 +189,45 @@ def update_channel_statistics(channel_id):
     """
     messages = get_all_messages(channel_id)
     for msg in messages['messages']:
-        print(msg)
-        add_post(msg['timestamp'], msg['stat']['views'], msg['body']['mid'], channel_id)
+        add_post(int(datetime.now().timestamp() * 1000), msg['stat']['views'], msg['body']['mid'], channel_id)
 
 
 def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
+    print("hehe")
     msg = "Перешлите боту сообщение, статистику по которому необходимо получить"
+    bot.send_message(msg, chat_id)
     mid = None
     while True:
         upd = bot.get_updates()
         mid = get_fwd_message_id(upd)
         if mid is not None:
             break
+    res = []
     if time_gap == "day":
         res = get_post_stat_by_day_from_to(mid, fr, to)
     if time_gap == "week":
         res = get_post_stat_by_week_from_to(mid, fr, to)
     if time_gap == "month":
         res = get_post_stat_by_month_from_to(mid, fr, to)
-    # прислать картинку
+    dates = []
+    views = []
+    for r in res:
+        dates.append(int(r[0].timestamp()))
+        views.append(r[1])
+    draw_statistics(dates, views, "tmp.png")
+    a = bot.attach_image("tmp.png")
+    bot.send_message("Статистика:", chat_id, attachments=a)
 
 
 def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
     update_channel_statistics(channel_id)
     res = []
     if time_gap == "day":
-        res = get_post_stat_by_day_from_to(channel_id, fr, to)
+        res = get_channel_stat_by_day_from_to(channel_id, fr, to)
     if time_gap == "week":
-        res = get_post_stat_by_week_from_to(channel_id, fr, to)
-    if time_gap == "month":
-        res = get_post_stat_by_month_from_to(channel_id, fr, to)
+        res = get_channel_stat_by_week_from_to(channel_id, fr, to)
+    #if time_gap == "month":
+    #    res = get_channel_stat_by_month_from_to(channel_id, fr, to)
     print(res)
     # прислать картинку
 
@@ -263,7 +280,7 @@ def gcs_get_stat(chat_id, channel_id, is_channel):
     text = bot.get_text(upd)
     if text == "skip":
         gcs_params(chat_id, channel_id, is_channel)
-    elif text == "exit":
+    elif text == "/exit":
         return
     elif len(text.split()) == 1:
         s = text.split('.')
@@ -382,27 +399,28 @@ def get_poll_statistics(chat_id):
           "/exit \n "
     bot.send_message(msg, chat_id)
     while True:
-        i = get_integer(chat_id, max)
-        if i is None:
+        j = get_integer(chat_id, max)
+        if j is None:
             break
-        stat = who_voted(opened_polls[num - 1][0], i)
+        stat = who_voted(opened_polls[num - 1][0], j)
         msg = ' '
         for i in range(len(stat) - 1):
             msg += stat[i][1] + ', '
         msg += stat[len(stat) - 1][1]
-        bot.send_message('За вариант №' + str(i + 1) + ' проголосовали: ' + msg, chat_id)
+        bot.send_message('За вариант №' + str(j) + ' проголосовали: ' + msg, chat_id)
 
 
 def poll_callback(callback_id, callback_payload, user_id, username):
     """
     Реакция на клик пользователя по варианту ответа в опросе
     """
-    bot.send_answer_callback(callback_id, "Ваш голос засчитан")
     poll_id = callback_payload.split("~~")[0]
     num = callback_payload.split("~~")[1]
-    rs = update_votes(poll_id, num, str(user_id), username)
+    rs = update_votes(poll_id, num, user_id, username)
     if rs is False:
         bot.send_answer_callback(callback_id, "Вы уже голосовали в этом опросе или опрос закрыт")
+    else:
+        bot.send_answer_callback(callback_id, "Ваш голос засчитан")
     return
 
 
@@ -452,7 +470,6 @@ def create_timed_post_or_poll(chat_id, channel_id):
                 bot.send_message(msg, chat_id)
                 continue
             vdt_sec = vdt.timestamp()
-            print(vdt_sec)
             dt_now = datetime.now().timestamp()
             timeto = int(vdt_sec) - int(dt_now)
             if timeto < 0:
@@ -466,7 +483,6 @@ def create_timed_post_or_poll(chat_id, channel_id):
 
 
 def create_timed_post(chat_id, channel_id, timeto):
-    print("hehe")
     msg = "Отправьте боту пост, который вы хотите опубликовать в канале"
     bot.send_message(msg, chat_id)
     upd = bot.get_updates()
