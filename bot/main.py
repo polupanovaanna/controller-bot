@@ -4,6 +4,7 @@ from datetime import datetime
 
 import requests
 from connect import *
+from threading import Thread
 
 from botapitamtam import BotHandler, logger
 from token_file import token
@@ -18,7 +19,8 @@ commands = [{"name": '/create_poll', "description": "Создание опрос
             {"name": '/close_poll', "description": "Закрытие опроса"},
             {"name": '/get_channel_statistics', "description": "Получить статистику по постам"},
             {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
-            {"name": '/set_channel', "description": "Выбор канала для работы с ботом"}]
+            {"name": '/set_channel', "description": "Выбор канала для работы с ботом"},
+            {"name": '/send_timed', "description": "Отправка отложенного поста или опроса"}]
 
 
 def convert_date_to_ms(date):
@@ -224,13 +226,18 @@ def get_channel_statistics(chat_id, channel_id):
 
 def chat_callback(chat_id, channel_id, callback_id, callback_payload):
     command = callback_payload.split("~~")
-    print(command)
     if len(command) == 2:
         if command[0] == "gcs":
             if command[1] == "channel":
                 gcs_get_stat(chat_id, channel_id, True)
             else:
                 gcs_get_stat(chat_id, channel_id, False)
+    if len(command) == 3:
+        if command[0] == "timed":
+            if command[1] == "poll":
+                create_poll(chat_id, channel_id, int(command[2]))
+            else:
+                create_timed_post(chat_id, channel_id, int(command[2]))
     if len(command) == 5:
         if command[0] == "gcstime":
             time_gap = command[1]
@@ -293,7 +300,7 @@ def gcs_params(chat_id, channel_id, is_channel, date1=0, date2=2147483647):
     bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
 
 
-def create_poll(chat_id, channel_id):
+def create_poll(chat_id, channel_id, timeto=0):
     """
     Создание опроса
     """
@@ -319,8 +326,16 @@ def create_poll(chat_id, channel_id):
     for var in answers:
         buttons.append(bot.button_callback(var[0], str(poll_id) + "~~" + str(i), intent='default'))
         i += 1
-    bot.send_message(poll_text_main, channel_id, attachments=bot.attach_buttons(buttons))
+    if timeto != 0:
+        bot.send_message("Опрос будет опубликован в указанное время", chat_id)
+    th = Thread(target=send_poll_to_channel, args=(channel_id, poll_text_main, bot.attach_buttons(buttons), timeto))
+    th.start()
     return
+
+
+def send_poll_to_channel(channel_id, text, attachments, timeto):
+    time.sleep(timeto)
+    bot.send_message(text, channel_id, attachments=attachments)
 
 
 def close_poll(chat_id):
@@ -413,11 +428,53 @@ def clear_channel_followers(chat_id, channel_id):
     bot.send_message("Пользователи были удалены", chat_id)
 
 
-# def send_timed_post(channel_id):
+def send_timed_post(channel_id, timeto, text, attachments):
+    time.sleep(timeto)
+    bot.send_message(text, channel_id, attachments=attachments)
 
 
-# def create_timed_post(chat_id):
-# проверить, что пользователь админ
+def create_timed_post_or_poll(chat_id, channel_id):
+    msg = "Введите дату и время, в которое пост будет выложен в канал в формате ДД.ММ.ГГГГ ЧЧ:ММ, например" \
+          " 11.10.2024 16:33 \n" \
+          "Для выхода выберите команду /exit"
+    bot.send_message(msg, chat_id)
+    msg = "Вы ввели дату и время в неверном формате. Попробуйте ещё раз."
+    timeto = None
+    while True:
+        upd = bot.get_updates()
+        if bot.get_update_type(upd) == 'message_created':
+            text = bot.get_text(upd)
+            if text == '/exit':
+                return
+            try:
+               vdt = datetime.strptime(text, '%d.%m.%Y %H:%M')
+            except ValueError:
+                bot.send_message(msg, chat_id)
+                continue
+            vdt_sec = vdt.timestamp()
+            print(vdt_sec)
+            dt_now = datetime.now().timestamp()
+            timeto = int(vdt_sec) - int(dt_now)
+            if timeto < 0:
+                timeto = 0
+            break
+
+    msg = "Вы хотите опубликовать пост или опрос?"
+    buttons = [bot.button_callback("Пост", "timed~~post~~" + str(timeto), intent='default'),
+               bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
+    bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
+
+
+def create_timed_post(chat_id, channel_id, timeto):
+    print("hehe")
+    msg = "Отправьте боту пост, который вы хотите опубликовать в канале"
+    bot.send_message(msg, chat_id)
+    upd = bot.get_updates()
+    text = bot.get_text(upd)
+    atch = bot.get_attachments(upd)
+    bot.send_message("Ваш пост будет опубликован в указанное время", chat_id)
+    th = Thread(target=send_timed_post, args=(channel_id, timeto, text, atch))
+    th.start()
 
 
 def main():
@@ -457,6 +514,8 @@ def main():
                         clear_channel_followers(chat_id, channel_id)
                     elif text == "/set_channel":
                         set_channel(chat_id, user_id)
+                    elif text == "/send_timed":
+                        create_timed_post_or_poll(chat_id, channel_id)
                     else:
                         bot.send_message("Ваша команда не распознана", chat_id)
                 elif upd_type == 'message_callback':
