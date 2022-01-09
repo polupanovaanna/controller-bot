@@ -20,10 +20,10 @@ def create_post_stat():
     """
     cur.execute(
         "CREATE TABLE post_stat (timestamp integer, "
-        "time integer, views integer, message_id integer);")
+        "time integer, views integer, message_id varchar);")
 
 
-def add_post(timestamp: int, views: int, message_id: int, chat_id: int):
+def add_post(timestamp: int, views: int, message_id: str, chat_id: int):
     """
     Add's note about post at this moment.
     """
@@ -101,28 +101,28 @@ def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
     return res
 
 
-def get_post_stat_by_day_from_to(message_id: int, fr = 0, to = 2147483647):
+def get_post_stat_by_day_from_to(message_id: str, fr = 0, to = 2147483647):
     """
     Returns count of new views between fr and to for post, with precision day.
     """
     return get_post_stat_from_to(message_id, 'day', fr, to)
 
 
-def get_post_stat_by_week_from_to(message_id: int, fr = 0, to = 2147483647):
+def get_post_stat_by_week_from_to(message_id: str, fr = 0, to = 2147483647):
     """
     Returns count of new views between fr and to for post, with precision week.
     """
     return get_post_stat_from_to(message_id, 'week', fr, to)
 
 
-def get_post_stat_by_month_from_to(message_id: int, fr = 0, to = 2147483647):
+def get_post_stat_by_month_from_to(message_id: str, fr = 0, to = 2147483647):
     """
     Returns count of new views between fr and to for post, with precision month.
     """
     return get_post_stat_from_to(message_id, 'month', fr, to)
 
 
-def get_post_stat_from_to(message_id: int, wtf: str, fr, to):
+def get_post_stat_from_to(message_id: str, wtf: str, fr, to):
     """
     Private
     Returns count of new views between fr and to for post, with precision wtf.
@@ -161,10 +161,10 @@ def create_channel_to_post():
     """
     cur.execute(
         "CREATE TABLE channel_post (chat_id integer, "
-        "message_id integer);")
+        "message_id varchar);")
 
 
-def add_message(chat_id: int, message_id: int):
+def add_message(chat_id: int, message_id: str):
     """
     Private
     Add's message to table channel-post.
@@ -188,7 +188,7 @@ def create_poll_voted():
     Create table for voted.
     """
     cur.execute(
-        "CREATE TABLE poll_voted (user_id integer, "
+        "CREATE TABLE poll_voted (user_id BIGINT, "
         "name varchar, id integer, index integer);")
 
 
@@ -210,6 +210,9 @@ def who_voted(id: int, index: int):
 
 
 def is_voted(chel_id: int, id: int):
+    """
+    Private, but u can use it.
+    """
     cur.execute(f"SELECT EXISTS(SELECT 1 FROM poll_voted WHERE id={id} AND user_id={chel_id});")
     return cur.fetchone()[0]
 
@@ -254,6 +257,9 @@ def update_votes(id: int, index: int, chel_id: int, name: str):
     """
     Add one vote to index ans.
     """
+    if is_voted(chel_id, id):
+        return
+    
     cur.execute("SELECT * FROM poll_info WHERE id = {};".format(id))
     res = cur.fetchone()
 
@@ -317,8 +323,10 @@ def create_all():
     create_post_stat()
     create_poll_info()
     create_channel_to_post()
-    create_poll_voted()
 
 
+# def update_votes(id: int, index: int, chel_id: int, name: str):
 if __name__ == "__main__":
+    update_votes(0, 0, 1, 'data2')
+    print(get_poll_statistics_db(0))
     close()
