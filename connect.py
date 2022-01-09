@@ -18,8 +18,8 @@ def create_user_stat():
     Create table for users
     """
     cur.execute(
-        "CREATE TABLE user_stat (timestamp integer, "
-        "user_id BIGINT, chat_id integer);")
+        "CREATE TABLE user_stat (timestamp BIGINT, "
+        "user_id BIGINT, chat_id BIGINT);")
 
 
 def create_post_stat():
@@ -28,8 +28,8 @@ def create_post_stat():
     Call to create table for posts.
     """
     cur.execute(
-        "CREATE TABLE post_stat (timestamp integer, "
-        "time integer, views integer, message_id varchar);")
+        "CREATE TABLE post_stat (timestamp BIGINT, "
+        "time BIGINT, views BIGINT, message_id varchar);")
 
 
 def add_post(timestamp: int, views: int, message_id: str, chat_id: int):
@@ -169,7 +169,7 @@ def create_channel_to_post():
     Creates table from channel to post_id
     """
     cur.execute(
-        "CREATE TABLE channel_post (chat_id integer, "
+        "CREATE TABLE channel_post (chat_id BIGINT, "
         "message_id varchar);")
 
 
@@ -187,8 +187,8 @@ def create_poll_info():
     Create table for poll.
     """
     cur.execute(
-        "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, "
-        "poll_name varchar, answers varchar ARRAY, voted integer ARRAY, closed boolean);")
+        "CREATE TABLE poll_info (id BIGINT PRIMARY KEY NOT NULL, "
+        "poll_name varchar, answers varchar ARRAY, voted BIGINT ARRAY, closed boolean);")
 
 
 def create_poll_voted():
@@ -198,7 +198,7 @@ def create_poll_voted():
     """
     cur.execute(
         "CREATE TABLE poll_voted (user_id BIGINT, "
-        "name varchar, id integer, index integer);")
+        "name varchar, id BIGINT, index BIGINT);")
 
 
 def who_voted(id: int, index: int):
