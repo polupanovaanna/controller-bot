@@ -3,7 +3,7 @@ import time
 
 cur = None
 conn = None
-table_name = "mentions_info044"
+table_name = "mentions_info065"
 
 
 def connect():
@@ -19,12 +19,12 @@ def create_spider_db():
 
 
 def add_channel(channel_id, time):
-    try:
+    #try:
         cur.execute(
             f"INSERT INTO {table_name} (channel_id, last_checked_message, first_checked_message, mentions) values (%s, %s, %s, %s);",
-            (channel_id, time, time, 1))
-    except:
-        pass
+            (channel_id, time, time, 0))
+   # except:
+    #    pass
 
 
 def add_mention(channel_id):
@@ -75,7 +75,7 @@ def get_all_chats():
 
 def get_mentions(chat_id):
     cur.execute("SELECT mentions from {} where channel_id={}".format(table_name, chat_id))
-
+    return cur.fetchone()
 
 connect()
-#create_spider_db()
+create_spider_db()

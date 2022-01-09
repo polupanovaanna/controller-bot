@@ -32,7 +32,6 @@ def add_mention(link):
         print("Someting went wrong...")
         raise
 
-
 def get_last_message_time(chat_id: int):
     params = {
         "chat_id": chat_id,
@@ -46,33 +45,41 @@ def get_last_message_time(chat_id: int):
 
 
 def dfs(chat_link):
+    print(chat_link)
     regexpr = r"(tt\.me/)([A-za-z0-9]+)"
     current_chat_id = get_chat_id(chat_link)
-    last_time = 0
     first_time = 0
     print("started")
     print(spider_db.get_all_chats())
-    if current_chat_id not in set(spider_db.get_all_chats()):
-        last_time = get_last_message_time(current_chat_id)
+    last_time = get_last_message_time(current_chat_id)
+    last_checked_time = last_time
+    if (current_chat_id,) not in set(spider_db.get_all_chats()):
         spider_db.set_last_time(current_chat_id, last_time)
         spider_db.set_first_time(current_chat_id, 0)
-        print("channel is new")
         spider_db.add_channel(current_chat_id, last_time)
     else:
-        first_time = spider_db.get_last_time(current_chat_id)
-        print("channel is old")
-    messages = get_chat_messages(chat_link, last_time)
+        first_time = spider_db.get_last_time(current_chat_id)[0]
+
+    messages = get_chat_messages(chat_link, last_time+1)
     need_check = True
-    print(len(messages))
     while need_check and len(messages) > 0:
         for message in messages:
             timestamp = message["timestamp"]
-            last_time = min(timestamp, last_time-10)
-            #print(last_time)
+            last_time = min(timestamp, last_time)
             if (timestamp <= first_time):
+                print("checked message")
                 need_check = False
                 break
-            if ("markup" not in message["body"].keys()):
+            matches = re.findall(regexpr, message["body"]["text"], re.MULTILINE)
+            for i in matches:
+                if i[1] == chat_link:
+                    continue
+                add_mention(i[1])
+                new_chat_id = get_chat_id(i[1])
+                if new_chat_id not in visited_channels:
+                    channels_queue.put(i[1])
+                    visited_channels.add(new_chat_id)
+            if "markup" not in message["body"].keys():
                 continue
             links = message["body"]["markup"]
             for link in links:
@@ -82,13 +89,17 @@ def dfs(chat_link):
                         if (i[1] == chat_link):
                             continue
                         add_mention(i[1])
-                        if (get_chat_id(i[1]) not in visited_channels):
+                        new_chat_id = get_chat_id(i[1])
+                        if (new_chat_id not in visited_channels):
                             channels_queue.put(i[1])
+                            visited_channels.add(new_chat_id)
                             print(i[1])
-        print(last_time)
         messages = get_chat_messages(chat_link, last_time)
+    spider_db.set_last_time(current_chat_id, last_checked_time)
     if spider_db.get_first_time(current_chat_id) == 0:
         spider_db.set_first_time(current_chat_id, last_time)
+    if channels_queue.empty():
+        return
     next_link = channels_queue.get()
     dfs(next_link)
 
@@ -112,17 +123,12 @@ def get_chat_messages(link: str, last_time: int):
         return []
     chat_id = chat["chat_id"]
 
-    params = get_params(chat_id, last_time)
+    params = get_params(chat_id, last_time-1)
     response = requests.get("https://botapi.tamtam.chat/messages", params=params)
-    #print(response.json()["messages"])
-    #exit(0)
     return response.json()["messages"]
 
 
-#print(get_last_message_time(get_chat_id("mytestchannel")))
-
 channels_queue = queue.Queue()
-dfs("mytestchannel")
-print(spider_db.get_all_chats())
-#1638363924221
-#1641330600753
+dfs("mytestchannel2")
+print(get_chat_id("mytestchannel"))
+print(spider_db.get_mentions(get_chat_id("mytestchannel")))
