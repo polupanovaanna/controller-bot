@@ -15,11 +15,81 @@ cur = conn.cursor()
 def create_user_stat():
     """
     Private
-    Create table for users
+    Create table for users.
     """
     cur.execute(
         "CREATE TABLE user_stat (timestamp BIGINT, "
-        "user_id BIGINT, chat_id BIGINT);")
+        "user_cnt BIGINT, chat_id BIGINT);")
+
+
+def get_all_chats():
+    """
+    returns all chat id's
+    """
+    cur.execute("SELECT DISTINCT chat_id FROM user_stat;")
+
+    res = []
+    tmp = cur.fetchone()
+    while tmp != None:
+        res.append(tmp[0])
+        tmp = cur.fetchone()
+
+    return res
+
+
+def add_chat_stat(time: int, count: int, chat_id: int):
+    """
+    give time and chat_id and cnt to write stat.
+    """
+    cur.execute(f"SELECT SUM(user_cnt) AS view FROM user_stat WHERE chat_id='{chat_id}';")
+
+    tmp = cur.fetchone()[0]
+    if tmp is None:
+        old = 0
+        cur.execute("INSERT INTO user_stat (timestamp, user_cnt, chat_id) VALUES (%s, %s, %s);",
+                    (time, count, chat_id))
+    else:
+        old = int(tmp)
+
+    cur.execute("INSERT INTO user_stat (timestamp, user_cnt, chat_id) VALUES (%s, %s, %s);",
+                (time, count - old, chat_id))
+
+
+def get_chat_stat_by_day_from_to(chat_id: int, fr = 0, to = 2147483647):
+    """
+    TODO
+    """
+    return get_chat_stat(chat_id, 'day', fr, to)
+
+
+def get_chat_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
+    """
+    TODO
+    """
+    return get_chat_stat(chat_id, 'week', fr, to)
+
+
+def get_chat_stat_by_month_from_to(chat_id: int, fr = 0, to = 2147483647):
+    """
+    TODO
+    """
+    return get_chat_stat(chat_id, 'month', fr, to)
+
+
+def get_chat_stat(chat_id: int, wtf: str, fr: int, to: int):
+    """
+    Private
+    user_stat by wtf.
+    """
+    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(timestamp)::date) AS month, SUM(user_cnt) AS user_sum FROM user_stat WHERE chat_id={chat_id} GROUP BY month ORDER BY month;")
+
+    res = []
+    tmp = cur.fetchone()
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+
+    return res
 
 
 def create_post_stat():
@@ -332,7 +402,7 @@ def create_all():
     create_post_stat()
     create_poll_info()
     create_channel_to_post()
-
+    create_user_stat()
 
 if __name__ == "__main__":
     close()
