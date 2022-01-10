@@ -65,6 +65,7 @@ def dfs():
     visited_channels_lock.acquire()
     if current_chat_id in visited_channels:
         visited_channels_lock.release()
+        dfs()
         return
     first_time = 0
     visited_channels.add(current_chat_id)
@@ -133,9 +134,6 @@ def dfs():
     if spider_db.get_first_time(current_chat_id) == 0:
         spider_db.set_first_time(current_chat_id, last_time)
     visited_channels_lock.release()
-    if channels_queue.empty():
-        return
-    status = "finished"
 
 def get_params(chat_id, last_time):
     params = {
@@ -168,7 +166,7 @@ channels_queue.put("mytestchannel2")
 #channels_queue.put("shootki")
 list_of_all = []
 visited_channels_lock = threading.Lock()
-workers = [None for i in range(8)] #TODO take links from internet
+workers = [None for i in range(20)] #TODO take links from internet
 status = "no status"
 while(True):
     any_workers = False
