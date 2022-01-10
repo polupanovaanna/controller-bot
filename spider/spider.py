@@ -16,7 +16,7 @@ def get_chat_id(link):
         chat_id = chat["chat_id"]
     else:
         print("No such channel: http://tt.me/" + link)
-        raise
+        зфыы
     return chat_id
 
 
@@ -30,7 +30,7 @@ def add_mention(link):
         spider_db.add_mention(chat_id)
     except:
         print("Someting went wrong...")
-        raise
+        pass
 
 def get_last_message_time(chat_id: int):
     params = {
