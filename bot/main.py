@@ -2,7 +2,6 @@ from random import randint
 import time
 from datetime import datetime
 import matplotlib.pyplot as plt
-import numpy as np
 
 import requests
 from connect import *
@@ -10,7 +9,7 @@ from threading import Thread
 
 from botapitamtam import BotHandler, logger
 from token_file import token
-from text import greeting_text, ask_for_perms_text, create_poll_intro, create_poll_ask_num
+from text import *
 
 url = 'https://botapi.tamtam.chat/'
 bot = BotHandler(token)
@@ -19,17 +18,17 @@ posts = {}  # dict: {channel_id, {timestamp, Post[]}}
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
             {"name": '/poll_statistics', "description": "Результаты опроса"},
             {"name": '/close_poll', "description": "Закрытие опроса"},
-            {"name": '/get_channel_statistics', "description": "Получить статистику по постам"},
+            {"name": '/get_channel_views_statistics', "description": "Получить статистику по просмотрам на постах"},
+            {"name": '/get_channel_members_statistics', "description": "Получить статистику по подписчикам канала"},
             {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
             {"name": '/set_channel', "description": "Выбор канала для работы с ботом"},
             {"name": '/send_timed', "description": "Отправка отложенного поста или опроса"}]
 
 
-def draw_statistics(dates, views, filename):
-    plt.bar(dates, views)
-    plt.ylabel("Число просмотров")
+def draw_statistics(dates, param, text, filename):
+    plt.bar(dates, param)
+    plt.ylabel(text)
     plt.xlabel("Дата")
-    #plt.plot([1, 2, 3], [1, 2, 3])
     plt.savefig(filename)
 
 
@@ -80,6 +79,9 @@ def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50
 
 
 def get_all_channel_members(channel_id, marker=None):
+    """
+    Дополнение к библиотеке. Возвращает список всех участников канала.
+    """
     method = 'chats/{}'.format(channel_id) + '/members'
     params = {
         "access_token": token,
@@ -123,6 +125,9 @@ def get_fwd_message_id(update):
 
 
 def get_integer(chat_id, maxval):
+    """
+    Получение числа в корректном диапазоне от пользователя
+    """
     number_of_ans = -1
     while 1:
         upd = bot.get_updates()
@@ -187,25 +192,87 @@ def set_channel(chat_id, user_id):
 
 def update_channel_statistics(channel_id):
     """
-    Обновление статистики по всем постам в канале: запускается как фоновой процесс
+    Обновление статистики просмотров по всем постам в канале и статистики подписчиков: запускается как фоновой
+    процесс ежедневно
     """
     messages = get_all_messages(channel_id)
     for msg in messages['messages']:
         add_post(int(datetime.now().timestamp() * 1000), msg['stat']['views'], msg['body']['mid'], channel_id)
+    cnt = bot.get_chat(channel_id)['participants_count']
+    add_chat_stat(int(datetime.now().timestamp() * 1000), cnt, channel_id)
 
 
-def send_stat_pic(chat_id, res):
+def send_stat_pic(chat_id, text, res):
+    """
+    Отправка сообщения с информацией о собранной статистике пользователю
+    """
     dates = []
-    views = []
+    param = []
     for r in res:
         dates.append(r[0].strftime("%m/%d/%Y"))
-        views.append(int(r[1]))
-    draw_statistics(dates, views, "tmp.png")
+        param.append(int(r[1]))
+    draw_statistics(dates, param, text, "tmp.png")
     a = bot.attach_image("tmp.png")
     bot.send_message("Статистика:", chat_id, attachments=a)
 
 
-def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
+def get_members_statistics(chat_id, channel_id):
+    """
+    Получение статистики прироста подписчиков в канале за различные промежутки времени
+    """
+    msg = get_stat_text
+    bot.send_message(msg, chat_id)
+    upd = bot.get_updates()
+    text = bot.get_text(upd)
+    msg = "Неверный формат даты. Попробуйте еще раз."
+    while True:
+        if text == "skip":
+            gms_params(chat_id, channel_id)
+        elif text == "/exit":
+            return
+        elif len(text.split()) == 1:
+            try:
+                d1 = datetime.strptime(text, '%d.%m.%Y')
+                gcs_params(chat_id, channel_id, d1)
+            except ValueError:
+                bot.send_message(msg, chat_id)
+                continue
+        elif len(text.split()) == 2:
+            try:
+                d1 = datetime.strptime(text.split()[0], '%d.%m.%Y')
+                d2 = datetime.strptime(text.split()[1], '%d.%m.%Y')
+                gcs_params(chat_id, channel_id, d1, int(d2))
+            except ValueError:
+                bot.send_message(msg, chat_id)
+                continue
+        else:
+            bot.send_message(msg, chat_id)
+
+
+def gms_params(chat_id, channel_id, date1=0, date2=2147483647):
+    msg = "Выберите временные отрезки, по которым вы хотите получать статистику"
+    strings = ["gms~~day", "gms~~week", "gms~~month"]
+    for i in range(len(strings)):
+        strings[i] += "~~" + str(date1) + "~~" + str(date2)
+
+    buttons = [bot.button_callback("День", strings[0], intent='default'),
+               bot.button_callback("Неделя", strings[1], intent='default'),
+               bot.button_callback("Месяц", strings[2], intent='default')]
+    bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
+
+
+def gms_get_stat(chat_id, channel_id, time_gap, fr, to):
+    res = []
+    if time_gap == "day":
+        res = get_chat_stat_by_day_from_to(channel_id, fr, to)
+    elif time_gap == "week":
+        res = get_chat_stat_by_week_from_to(channel_id, fr, to)
+    elif time_gap == "month":
+        res = get_chat_stat_by_month_from_to(channel_id, fr, to)
+    send_stat_pic(chat_id, "Количество просмотров", res)
+
+
+def get_post_statistics(chat_id, channel_id, time_gap, fr, to):
     msg = "Перешлите боту сообщение, статистику по которому необходимо получить"
     bot.send_message(msg, chat_id)
     mid = None
@@ -221,7 +288,7 @@ def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
         res = get_post_stat_by_week_from_to(mid, fr, to)
     if time_gap == "month":
         res = get_post_stat_by_month_from_to(mid, fr, to)
-    send_stat_pic(chat_id, res)
+    send_stat_pic(chat_id, "Количество просмотров", res)
 
 
 def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
@@ -233,10 +300,13 @@ def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
         res = get_channel_stat_by_week_from_to(channel_id, fr, to)
     # if time_gap == "month":
     #    res = get_channel_stat_by_month_from_to(channel_id, fr, to)
-    send_stat_pic(chat_id, res)
+    send_stat_pic(chat_id, "Количество просмотров", res)
 
 
 def get_channel_statistics(chat_id, channel_id):
+    """
+    Вспомогательная функция для получения информации от пользователя (статистика по каналу)
+    """
     msg = "Выберите, хотите вы получить статистику по всему каналу или по определенному посту"
     buttons = [bot.button_callback("По каналу", "gcs~~channel", intent='default'),
                bot.button_callback("По посту", "gcs~~post", intent='default'),
@@ -246,6 +316,9 @@ def get_channel_statistics(chat_id, channel_id):
 
 
 def chat_callback(chat_id, channel_id, callback_id, callback_payload):
+    """
+    Обработка нажатий на кнопку, поступающих от пользователя
+    """
     command = callback_payload.split("~~")
     if len(command) == 2:
         if command[0] == "gcs":
@@ -259,6 +332,9 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
                 create_poll(chat_id, channel_id, int(command[2]))
             else:
                 create_timed_post(chat_id, channel_id, int(command[2]))
+    if len(command) == 4:
+        if command[0] == "gms":
+            gms_get_stat(chat_id, channel_id, command[1], command[2], command[3])
     if len(command) == 5:
         if command[0] == "gcstime":
             time_gap = command[1]
@@ -267,18 +343,14 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
             if command[2] == "ch":
                 get_ch_statictics(chat_id, channel_id, time_gap, fr, to)
             else:
-                get_post_statictics(chat_id, channel_id, time_gap, fr, to)
+                get_post_statistics(chat_id, channel_id, time_gap, fr, to)
 
 
 def gcs_get_stat(chat_id, channel_id, is_channel):
     """
     is_channel true if we need channel stat else false
-    is_channel true if we need channel stat else false
     """
-    msg = "Введите одну или две даты через пробел в формате ДД.ММ.ГГГГ, например 21.02.1930 \n" \
-          "Первая дата - начало временного промежутка, вторая - конец (необязательный параметр) \n" \
-          "Если вы хотите получить статистику за все доступное боту время, введите команду skip \n" \
-          "Для выхода введите команду /exit"
+    msg = get_stat_text
     bot.send_message(msg, chat_id)
     upd = bot.get_updates()
     text = bot.get_text(upd)
@@ -451,11 +523,17 @@ def clear_channel_followers(chat_id, channel_id):
 
 
 def send_timed_post(channel_id, timeto, text, attachments):
+    """
+    Непосредственно отложенная отправка поста
+    """
     time.sleep(timeto)
     bot.send_message(text, channel_id, attachments=attachments)
 
 
 def create_timed_post_or_poll(chat_id, channel_id):
+    """
+    Основная функция для создания отложенного поста, запускается первой. Содержит пользовательский интерфейс.
+    """
     msg = "Введите дату и время, в которое пост будет выложен в канал в формате ДД.ММ.ГГГГ ЧЧ:ММ, например" \
           " 11.10.2024 16:33 \n" \
           "Для выхода выберите команду /exit"
@@ -528,8 +606,10 @@ def main():
                         close_poll(chat_id)
                     elif text == "/poll_statistics":
                         get_poll_statistics(chat_id)
-                    elif text == "/get_channel_statistics":
+                    elif text == "/get_channel_views_statistics":
                         get_channel_statistics(chat_id, channel_id)
+                    elif text == "/get_channel_members_statistics":
+                        get_members_statistics(chat_id, channel_id)
                     elif text == "/clear_members":
                         clear_channel_followers(chat_id, channel_id)
                     elif text == "/set_channel":
