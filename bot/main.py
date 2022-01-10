@@ -26,8 +26,10 @@ commands = [{"name": '/create_poll', "description": "Создание опрос
 
 
 def draw_statistics(dates, views, filename):
-    fig = plt.figure()
-    plt.plot(dates, views)
+    plt.bar(dates, views)
+    plt.ylabel("Число просмотров")
+    plt.xlabel("Дата")
+    #plt.plot([1, 2, 3], [1, 2, 3])
     plt.savefig(filename)
 
 
@@ -192,8 +194,18 @@ def update_channel_statistics(channel_id):
         add_post(int(datetime.now().timestamp() * 1000), msg['stat']['views'], msg['body']['mid'], channel_id)
 
 
+def send_stat_pic(chat_id, res):
+    dates = []
+    views = []
+    for r in res:
+        dates.append(r[0].strftime("%m/%d/%Y"))
+        views.append(int(r[1]))
+    draw_statistics(dates, views, "tmp.png")
+    a = bot.attach_image("tmp.png")
+    bot.send_message("Статистика:", chat_id, attachments=a)
+
+
 def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
-    print("hehe")
     msg = "Перешлите боту сообщение, статистику по которому необходимо получить"
     bot.send_message(msg, chat_id)
     mid = None
@@ -209,14 +221,7 @@ def get_post_statictics(chat_id, channel_id, time_gap, fr, to):
         res = get_post_stat_by_week_from_to(mid, fr, to)
     if time_gap == "month":
         res = get_post_stat_by_month_from_to(mid, fr, to)
-    dates = []
-    views = []
-    for r in res:
-        dates.append(int(r[0].timestamp()))
-        views.append(r[1])
-    draw_statistics(dates, views, "tmp.png")
-    a = bot.attach_image("tmp.png")
-    bot.send_message("Статистика:", chat_id, attachments=a)
+    send_stat_pic(chat_id, res)
 
 
 def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
@@ -226,10 +231,9 @@ def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
         res = get_channel_stat_by_day_from_to(channel_id, fr, to)
     if time_gap == "week":
         res = get_channel_stat_by_week_from_to(channel_id, fr, to)
-    #if time_gap == "month":
+    # if time_gap == "month":
     #    res = get_channel_stat_by_month_from_to(channel_id, fr, to)
-    print(res)
-    # прислать картинку
+    send_stat_pic(chat_id, res)
 
 
 def get_channel_statistics(chat_id, channel_id):
@@ -465,7 +469,7 @@ def create_timed_post_or_poll(chat_id, channel_id):
             if text == '/exit':
                 return
             try:
-               vdt = datetime.strptime(text, '%d.%m.%Y %H:%M')
+                vdt = datetime.strptime(text, '%d.%m.%Y %H:%M')
             except ValueError:
                 bot.send_message(msg, chat_id)
                 continue
