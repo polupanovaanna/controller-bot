@@ -29,10 +29,16 @@ def get_chat_link(chat_id):
 def add_mention(link):
     try:
         chat_id = get_chat_id(link)
+        if(chat_id == FAIL):
+            return FAIL
+        visited_channels_lock.acquire()
         spider_db.add_mention(chat_id)
+        visited_channels_lock.release()
         return SUCCESS
-    except:
+    except Exception as e:
         print("Someting went wrong...")
+        print(spider_db.cur.statusmessage)
+        print(e)
         return FAIL
 
 
@@ -49,10 +55,9 @@ def get_last_message_time(chat_id: int):
 
 
 def dfs():
-    global status
-    if channels_queue.empty():
-        return
-    chat_link = channels_queue.get_nowait()
+    global status, channels_queue, list_of_all, visited_channels
+    chat_link = channels_queue.get()
+    added_channels = set()
     regexpr = r"(tt\.me/)([A-za-z0-9]+)"
     current_chat_id = get_chat_id(chat_link)
     if current_chat_id == FAIL:
@@ -62,8 +67,9 @@ def dfs():
         visited_channels_lock.release()
         return
     first_time = 0
+    visited_channels.add(current_chat_id)
     status = "started"
-    print(spider_db.get_all_chats())
+    #print(spider_db.get_all_chats())
     last_time = get_last_message_time(current_chat_id)
     last_checked_time = last_time
     if (current_chat_id,) not in set(spider_db.get_all_chats()):
@@ -72,12 +78,13 @@ def dfs():
         spider_db.add_channel(current_chat_id, last_time)
     else:
         first_time = spider_db.get_last_time(current_chat_id)[0]
+
     visited_channels_lock.release()
     messages = get_chat_messages(chat_link, last_time + 1)
     need_check = True
     while need_check and len(messages) > 0:
         for message in messages:
-            print(message)
+            #print(message)
             status = message
             timestamp = message["timestamp"]
             last_time = min(timestamp, last_time)
@@ -87,7 +94,7 @@ def dfs():
                 break
             matches = re.findall(regexpr, message["body"]["text"], re.MULTILINE)
             status = "checking mathes"
-            print(matches)
+           # print(matches)
             for i in matches:
                 if i[1] == chat_link:
                     continue
@@ -96,22 +103,19 @@ def dfs():
                 if (new_chat_id == FAIL):
                     print("fail to get chat id")
                     continue
-                visited_channels_lock.acquire()
-                if new_chat_id not in visited_channels:
+                if new_chat_id not in visited_channels and new_chat_id not in added_channels:
                     list_of_all.append(i[1])
                     channels_queue.put(i[1])
-                    visited_channels.add(new_chat_id)
-                visited_channels_lock.release()
+                    added_channels.add(new_chat_id)
             if "markup" not in message["body"].keys():
                 continue
             links = message["body"]["markup"]
             status = "checking links"
             for link in links:
-                print(link)
+                #print(link)
                 if (link["type"] == "link"):
                     match = re.findall(regexpr, link["url"], re.MULTILINE)
                     for i in match:
-                        print(i[1])
                         if (i[1] == chat_link):
                             continue
                         add_mention(i[1])
@@ -119,17 +123,16 @@ def dfs():
                         new_chat_id = get_chat_id(i[1])
                         if (new_chat_id == FAIL):
                             continue
-                        visited_channels_lock.acquire()
-                        if new_chat_id not in visited_channels:
+                        if new_chat_id not in visited_channels and new_chat_id not in added_channels:
                             channels_queue.put(i[1])
-                            visited_channels.add(new_chat_id)
-                            print(i[1])
-                        visited_channels_lock.release()
+                            added_channels.add(new_chat_id)
         status = "getting new messages"
         messages = get_chat_messages(chat_link, last_time)
+    visited_channels_lock.acquire()
     spider_db.set_last_time(current_chat_id, last_checked_time)
     if spider_db.get_first_time(current_chat_id) == 0:
         spider_db.set_first_time(current_chat_id, last_time)
+    visited_channels_lock.release()
     if channels_queue.empty():
         return
     status = "finished"
@@ -160,28 +163,24 @@ def get_chat_messages(link: str, last_time: int):
 
 
 channels_queue = queue.Queue()
-channels_queue.put("mytestchannel")
+channels_queue.put("mytestchannel2")
+
 #channels_queue.put("shootki")
 list_of_all = []
 visited_channels_lock = threading.Lock()
-workers = [None for i in range(10)] #TODO take links from internet
+workers = [None for i in range(8)] #TODO take links from internet
 status = "no status"
 while(True):
-    print(visited_channels)
     any_workers = False
     for i in range(len(workers)):
         any_workers = any_workers or workers[i] is not None and workers[i].is_alive()
         if workers[i] is None or not workers[i].is_alive():
             if not channels_queue.empty():
                 print("starting new thread channel is", channels_queue.queue[0])
+                if workers[i] is not None:
+                    workers[i].join()
                 workers[i] = threading.Thread(target=dfs)
                 workers[i].start()
-    print(visited_channels_lock.locked())
-    print(channels_queue.mutex.locked())
-    print(status)
-    print(channels_queue.empty())
-    print(list_of_all)
+
+    time.sleep(10)
     print(channels_queue.queue)
-    sleep(150)
-#print(get_chat_id("mytestchannel"))
-#print(spider_db.get_mentions(get_chat_id("mytestchannel")))
