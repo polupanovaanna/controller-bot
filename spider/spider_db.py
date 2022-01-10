@@ -3,7 +3,7 @@ import time
 
 cur = None
 conn = None
-table_name = "mentions_info065"
+table_name = "mentions_info103"
 
 
 def connect():
