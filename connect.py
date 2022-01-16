@@ -12,6 +12,85 @@ conn = psycopg2.connect(
 conn.autocommit = True
 cur = conn.cursor()
 
+def create_user_stat():
+    """
+    Private
+    Create table for users.
+    """
+    cur.execute(
+        "CREATE TABLE user_stat (timestamp BIGINT, "
+        "user_cnt BIGINT, chat_id BIGINT);")
+
+
+def get_all_chats():
+    """
+    returns all chat id's
+    """
+    cur.execute("SELECT DISTINCT chat_id FROM user_stat;")
+
+    res = []
+    tmp = cur.fetchone()
+    while tmp != None:
+        res.append(tmp[0])
+        tmp = cur.fetchone()
+
+    return res
+
+
+def add_chat_stat(time: int, count: int, chat_id: int):
+    """
+    give time and chat_id and cnt to write stat.
+    """
+    cur.execute(f"SELECT SUM(user_cnt) AS view FROM user_stat WHERE chat_id='{chat_id}';")
+
+    tmp = cur.fetchone()[0]
+    if tmp is None:
+        old = 0
+        cur.execute("INSERT INTO user_stat (timestamp, user_cnt, chat_id) VALUES (%s, %s, %s);",
+                    (time, count, chat_id))
+    else:
+        old = int(tmp)
+
+    cur.execute("INSERT INTO user_stat (timestamp, user_cnt, chat_id) VALUES (%s, %s, %s);",
+                (time, count - old, chat_id))
+
+
+def get_chat_stat_by_day_from_to(chat_id: int, fr = 0, to = 2147483647):
+    """
+    TODO
+    """
+    return get_chat_stat(chat_id, 'day', fr, to)
+
+
+def get_chat_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
+    """
+    TODO
+    """
+    return get_chat_stat(chat_id, 'week', fr, to)
+
+
+def get_chat_stat_by_month_from_to(chat_id: int, fr = 0, to = 2147483647):
+    """
+    TODO
+    """
+    return get_chat_stat(chat_id, 'month', fr, to)
+
+
+def get_chat_stat(chat_id: int, wtf: str, fr: int, to: int):
+    """
+    Private
+    user_stat by wtf.
+    """
+    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(timestamp)::date) AS month, SUM(user_cnt) AS user_sum FROM user_stat WHERE chat_id={chat_id} GROUP BY month ORDER BY month;")
+
+    res = []
+    tmp = cur.fetchone()
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+
+    return res
+
 
 def create_post_stat():
     """
@@ -19,15 +98,15 @@ def create_post_stat():
     Call to create table for posts.
     """
     cur.execute(
-        "CREATE TABLE post_stat (timestamp integer, "
-        "time integer, views integer, message_id integer);")
+        "CREATE TABLE post_stat (timestamp BIGINT, "
+        "time BIGINT, views BIGINT, message_id varchar);")
 
 
-def add_post(timestamp: int, views: int, message_id: int, chat_id: int):
+def add_post(timestamp: int, views: int, message_id: str, chat_id: int):
     """
     Add's note about post at this moment.
     """
-    cur.execute(f"SELECT SUM(views) AS view FROM post_stat WHERE message_id={message_id};")
+    cur.execute(f"SELECT SUM(views) AS view FROM post_stat WHERE message_id='{message_id}';")
 
     tmp = cur.fetchone()[0]
     if tmp is None:
@@ -77,7 +156,7 @@ def get_channel_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
     return get_channel_stat_from_to(chat_id, 'week', fr, to)
 
 
-def get_channel_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_channel_stat_by_month_from_to(chat_id: int, fr = 0, to = 2147483647):
     """
     Views stat for all posts from channel with precision month.
     You can add 'from' and 'to'.
@@ -101,33 +180,33 @@ def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
     return res
 
 
-def get_post_stat_by_day_from_to(message_id: int, fr = 0, to = 2147483647):
+def get_post_stat_by_day_from_to(message_id: str, fr = 0, to = 2147483647):
     """
     Returns count of new views between fr and to for post, with precision day.
     """
     return get_post_stat_from_to(message_id, 'day', fr, to)
 
 
-def get_post_stat_by_week_from_to(message_id: int, fr = 0, to = 2147483647):
+def get_post_stat_by_week_from_to(message_id: str, fr = 0, to = 2147483647):
     """
     Returns count of new views between fr and to for post, with precision week.
     """
     return get_post_stat_from_to(message_id, 'week', fr, to)
 
 
-def get_post_stat_by_month_from_to(message_id: int, fr = 0, to = 2147483647):
+def get_post_stat_by_month_from_to(message_id: str, fr = 0, to = 2147483647):
     """
     Returns count of new views between fr and to for post, with precision month.
     """
     return get_post_stat_from_to(message_id, 'month', fr, to)
 
 
-def get_post_stat_from_to(message_id: int, wtf: str, fr, to):
+def get_post_stat_from_to(message_id: str, wtf: str, fr, to):
     """
     Private
     Returns count of new views between fr and to for post, with precision wtf.
     """
-    cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id={message_id} AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
+    cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id='{message_id}' AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -160,11 +239,11 @@ def create_channel_to_post():
     Creates table from channel to post_id
     """
     cur.execute(
-        "CREATE TABLE channel_post (chat_id integer, "
-        "message_id integer);")
+        "CREATE TABLE channel_post (chat_id BIGINT, "
+        "message_id varchar);")
 
 
-def add_message(chat_id: int, message_id: int):
+def add_message(chat_id: int, message_id: str):
     """
     Private
     Add's message to table channel-post.
@@ -178,8 +257,8 @@ def create_poll_info():
     Create table for poll.
     """
     cur.execute(
-        "CREATE TABLE poll_info (id integer PRIMARY KEY NOT NULL, "
-        "poll_name varchar, answers varchar ARRAY, voted integer ARRAY, closed boolean);")
+        "CREATE TABLE poll_info (id BIGINT PRIMARY KEY NOT NULL, "
+        "poll_name varchar, answers varchar ARRAY, voted BIGINT ARRAY, closed boolean);")
 
 
 def create_poll_voted():
@@ -188,8 +267,8 @@ def create_poll_voted():
     Create table for voted.
     """
     cur.execute(
-        "CREATE TABLE poll_voted (user_id integer, "
-        "name varchar, id integer, index integer);")
+        "CREATE TABLE poll_voted (user_id BIGINT, "
+        "name varchar, id BIGINT, index BIGINT);")
 
 
 def who_voted(id: int, index: int):
@@ -210,6 +289,9 @@ def who_voted(id: int, index: int):
 
 
 def is_voted(chel_id: int, id: int):
+    """
+    Private, but u can use it.
+    """
     cur.execute(f"SELECT EXISTS(SELECT 1 FROM poll_voted WHERE id={id} AND user_id={chel_id});")
     return cur.fetchone()[0]
 
@@ -254,6 +336,9 @@ def update_votes(id: int, index: int, chel_id: int, name: str):
     """
     Add one vote to index ans.
     """
+    if is_voted(chel_id, id):
+        return
+    
     cur.execute("SELECT * FROM poll_info WHERE id = {};".format(id))
     res = cur.fetchone()
 
@@ -317,8 +402,7 @@ def create_all():
     create_post_stat()
     create_poll_info()
     create_channel_to_post()
-    create_poll_voted()
-
+    create_user_stat()
 
 if __name__ == "__main__":
     close()
