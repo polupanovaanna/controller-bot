@@ -14,6 +14,8 @@ from text import *
 url = 'https://botapi.tamtam.chat/'
 bot = BotHandler(token)
 
+max_time = 2147483647
+
 
 class State:
     def __init__(self):
@@ -166,6 +168,59 @@ def get_integer(chat_id, maxval, upd):
         bot.send_message("Вы ввели число вне допустимого диапазона. Попробуйте еще раз.", chat_id)
 
 
+def get_date(chat_id, text):
+    """
+    Возвращает массив с одной или двумя датами в формате unix timestamp. Если пользователь вводит команду
+    skip, возвращаются дефолтные значения - 0 и maxint (до 2030 года это бесконечность)
+    """
+    msg = "Неверно введен формат даты. Попробуйте еще раз."
+    if text == "skip":
+        return [0, max_time]
+    elif text == "/exit":
+        reset_state()
+        return None
+    elif len(text.split()) == 1:
+        try:
+            d1 = datetime.strptime(text, '%d.%m.%Y')
+            return [d1, max_time]
+        except ValueError:
+            bot.send_message(msg, chat_id)
+            return None
+    elif len(text.split()) == 2:
+        try:
+            d1 = datetime.strptime(text.split()[0], '%d.%m.%Y')
+            d2 = datetime.strptime(text.split()[1], '%d.%m.%Y')
+            return [d1, d2]
+        except ValueError:
+            bot.send_message(msg, chat_id)
+            return None
+    else:
+        bot.send_message(msg, chat_id)
+        return None
+
+
+def get_date_time(chat_id, text):
+    msg = "Неверный формат даты и времени. Попробуйте еще раз"
+    if text == '/exit':
+        reset_state()
+        return
+    try:
+        vdt = datetime.strptime(text, '%d.%m.%Y %H:%M')
+    except ValueError:
+        bot.send_message(msg, chat_id)
+        return None
+    vdt_sec = vdt.timestamp()
+    return vdt_sec
+
+
+def get_fwd(chat_id, upd):
+    mid = get_fwd_message_id(upd)
+    if mid is None:
+        bot.send_message("Перешлите боту сообщение, по которому необходимо получить статистику, либо введите /exit",
+                         chat_id)
+    return mid
+
+
 def check_user_rights(user_id, channel_id, chat_id):
     """
     Проверка, что пользователь является админом канала
@@ -175,7 +230,6 @@ def check_user_rights(user_id, channel_id, chat_id):
     for mem in members['members']:
         if mem['user_id'] == user_id:
             return True
-    # bot.send_message("В настоящий момент вы не являетесь администратором данного канала", chat_id)
     return False
 
 
@@ -213,6 +267,9 @@ def set_channel_1(chat_id, user_id):
 def set_channel_2(chat_id, channel_id, channels, num):
     msg = "Канал был успешно установлен!"
     bot.send_message(msg, chat_id)
+    # TODO сделать if через бд что потока для канала еще не было
+    th = Thread(target=update_channel_statistics, args=channel_id)
+    th.start()
     return channels[num - 1]['chat_id']
 
 
@@ -221,11 +278,13 @@ def update_channel_statistics(channel_id):
     Обновление статистики просмотров по всем постам в канале и статистики подписчиков: запускается как фоновой
     процесс ежедневно
     """
-    messages = get_all_messages(channel_id)
-    for msg in messages['messages']:
-        add_post(int(datetime.now().timestamp() * 1000), msg['stat']['views'], msg['body']['mid'], channel_id)
-    cnt = bot.get_chat(channel_id)['participants_count']
-    add_chat_stat(int(datetime.now().timestamp() * 1000), cnt, channel_id)
+    while True:
+        messages = get_all_messages(channel_id)
+        for msg in messages['messages']:
+            add_post(int(datetime.now().timestamp() * 1000), msg['stat']['views'], msg['body']['mid'], channel_id)
+        cnt = bot.get_chat(channel_id)['participants_count']
+        add_chat_stat(int(datetime.now().timestamp() * 1000), cnt, channel_id)
+        time.sleep(86400)
 
 
 def send_stat_pic(chat_id, text, res):
@@ -242,40 +301,17 @@ def send_stat_pic(chat_id, text, res):
     bot.send_message("Статистика:", chat_id, attachments=a)
 
 
-def get_members_statistics(chat_id, channel_id):
+def get_members_statistics_1(chat_id, channel_id):
     """
     Получение статистики прироста подписчиков в канале за различные промежутки времени
     """
     msg = get_stat_text
     bot.send_message(msg, chat_id)
-    upd = bot.get_updates()
-    text = bot.get_text(upd)
-    msg = "Неверный формат даты. Попробуйте еще раз."
-    while True:
-        if text == "skip":
-            gms_params(chat_id, channel_id)
-        elif text == "/exit":
-            return
-        elif len(text.split()) == 1:
-            try:
-                d1 = datetime.strptime(text, '%d.%m.%Y')
-                gcs_params(chat_id, channel_id, d1)
-            except ValueError:
-                bot.send_message(msg, chat_id)
-                continue
-        elif len(text.split()) == 2:
-            try:
-                d1 = datetime.strptime(text.split()[0], '%d.%m.%Y')
-                d2 = datetime.strptime(text.split()[1], '%d.%m.%Y')
-                gcs_params(chat_id, channel_id, d1, int(d2))
-            except ValueError:
-                bot.send_message(msg, chat_id)
-                continue
-        else:
-            bot.send_message(msg, chat_id)
+    bot_state.state = "get_date"
+    bot_state.next = "gms_params"
 
 
-def gms_params(chat_id, channel_id, date1=0, date2=2147483647):
+def gms_params(chat_id, channel_id, date1, date2):
     msg = "Выберите временные отрезки, по которым вы хотите получать статистику"
     strings = ["gms~~day", "gms~~week", "gms~~month"]
     for i in range(len(strings)):
@@ -298,15 +334,15 @@ def gms_get_stat(chat_id, channel_id, time_gap, fr, to):
     send_stat_pic(chat_id, "Количество просмотров", res)
 
 
-def get_post_statistics(chat_id, channel_id, time_gap, fr, to):
+def get_post_statistics_1(chat_id, channel_id, time_gap, fr, to):
     msg = "Перешлите боту сообщение, статистику по которому необходимо получить"
     bot.send_message(msg, chat_id)
-    mid = None
-    while True:
-        upd = bot.get_updates()
-        mid = get_fwd_message_id(upd)
-        if mid is not None:
-            break
+    bot_state.state = "get_fwd"
+    bot_state.next = "get_post_statistics_2"
+    bot_state.params = [time_gap, fr, to]
+
+
+def get_post_statistics_2(chat_id, channel_id, mid, time_gap, fr, to):
     res = []
     if time_gap == "day":
         res = get_post_stat_by_day_from_to(mid, fr, to)
@@ -318,14 +354,13 @@ def get_post_statistics(chat_id, channel_id, time_gap, fr, to):
 
 
 def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
-    update_channel_statistics(channel_id)
     res = []
     if time_gap == "day":
         res = get_channel_stat_by_day_from_to(channel_id, fr, to)
     if time_gap == "week":
         res = get_channel_stat_by_week_from_to(channel_id, fr, to)
-    # if time_gap == "month":
-    #    res = get_channel_stat_by_month_from_to(channel_id, fr, to)
+    if time_gap == "month":
+        res = get_channel_stat_by_month_from_to(channel_id, fr, to)
     send_stat_pic(chat_id, "Количество просмотров", res)
 
 
@@ -349,9 +384,9 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
     if len(command) == 2:
         if command[0] == "gcs":
             if command[1] == "channel":
-                gcs_get_stat(chat_id, channel_id, True)
+                gcs_get_stat_1(chat_id, channel_id, True)
             else:
-                gcs_get_stat(chat_id, channel_id, False)
+                gcs_get_stat_1(chat_id, channel_id, False)
     if len(command) == 3:
         if command[0] == "timed":
             if command[1] == "poll":
@@ -369,39 +404,21 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
             if command[2] == "ch":
                 get_ch_statictics(chat_id, channel_id, time_gap, fr, to)
             else:
-                get_post_statistics(chat_id, channel_id, time_gap, fr, to)
+                get_post_statistics_1(chat_id, channel_id, time_gap, fr, to)
 
 
-def gcs_get_stat(chat_id, channel_id, is_channel):
+def gcs_get_stat_1(chat_id, channel_id, is_channel):
     """
-    is_channel true if we need channel stat else false
+    Получение статистики по одному или всем постам канала. По всем постам: если параметр is_channel = True
     """
     msg = get_stat_text
     bot.send_message(msg, chat_id)
-    upd = bot.get_updates()
-    text = bot.get_text(upd)
-    if text == "skip":
-        gcs_params(chat_id, channel_id, is_channel)
-    elif text == "/exit":
-        return
-    elif len(text.split()) == 1:
-        s = text.split('.')
-        d = datetime(int(s[2]), int(s[1]), int(s[0]))
-        unixtime = time.mktime(d.timetuple())
-        gcs_params(chat_id, channel_id, is_channel, int(unixtime))
-    elif len(text.split()) == 2:
-        s1 = text.split()[0].split('.')
-        s2 = text.split()[1].split('.')
-        d1 = datetime(int(s1[2]), int(s1[1]), int(s1[0]))
-        d2 = datetime(int(s2[2]), int(s2[1]), int(s2[0]))
-        unixtime1 = time.mktime(d1.timetuple())
-        unixtime2 = time.mktime(d2.timetuple())
-        gcs_params(chat_id, channel_id, is_channel, int(unixtime1), int(unixtime2))
-    else:
-        bot.send_message("Неправильный формат ввода", chat_id)
+    bot_state.state = "get_date"
+    bot_state.next = "gcs_params"
+    bot_state.params = [is_channel]
 
 
-def gcs_params(chat_id, channel_id, is_channel, date1=0, date2=2147483647):
+def gcs_params(chat_id, channel_id, is_channel, date1, date2):
     msg = "Выберите временные отрезки, по которым вы хотите получать статистику"
     strings = ["gcstime~~day", "gcstime~~week", "gcstime~~month"]
     if is_channel:
@@ -598,7 +615,7 @@ def send_timed_post(channel_id, timeto, text, attachments):
     bot.send_message(text, channel_id, attachments=attachments)
 
 
-def create_timed_post_or_poll(chat_id, channel_id):
+def create_timed_post_or_poll_1(chat_id, channel_id):
     """
     Основная функция для создания отложенного поста, запускается первой. Содержит пользовательский интерфейс.
     """
@@ -606,29 +623,19 @@ def create_timed_post_or_poll(chat_id, channel_id):
           " 11.10.2024 16:33 \n" \
           "Для выхода выберите команду /exit"
     bot.send_message(msg, chat_id)
-    msg = "Вы ввели дату и время в неверном формате. Попробуйте ещё раз."
-    timeto = None
-    while True:
-        upd = bot.get_updates()
-        if bot.get_update_type(upd) == 'message_created':
-            text = bot.get_text(upd)
-            if text == '/exit':
-                return
-            try:
-                vdt = datetime.strptime(text, '%d.%m.%Y %H:%M')
-            except ValueError:
-                bot.send_message(msg, chat_id)
-                continue
-            vdt_sec = vdt.timestamp()
-            dt_now = datetime.now().timestamp()
-            timeto = int(vdt_sec) - int(dt_now)
-            if timeto < 0:
-                timeto = 0
-            break
+    bot_state.state = "get_date_time"
+    bot_state.next = "create_timed_post_or_poll_2"
+
+
+def create_timed_post_or_poll_2(chat_id, channel_id, vdt_sec):
+    dt_now = datetime.now().timestamp()
+    timeto = int(vdt_sec) - int(dt_now)
+    if timeto < 0:
+        timeto = 0
 
     msg = "Вы хотите опубликовать пост или опрос?"
     buttons = [bot.button_callback("Пост", "timed~~post~~" + str(timeto), intent='default'),
-               bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
+              bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
     bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
 
 
@@ -667,6 +674,7 @@ def main():
                     set_channel_1(chat_id, user_id)
                     continue
                 elif upd_type == "message_created":
+                    #TODO проверить user_id и поставить канал в соответствие
                     text = bot.get_text(upd)
                     if text == "/create_poll":
                         create_poll_1(chat_id, channel_id)
@@ -677,13 +685,13 @@ def main():
                     elif text == "/get_channel_views_statistics":
                         get_channel_statistics(chat_id, channel_id)
                     elif text == "/get_channel_members_statistics":
-                        get_members_statistics(chat_id, channel_id)
+                        get_members_statistics_1(chat_id, channel_id)
                     elif text == "/clear_members":
                         clear_channel_followers_1(chat_id, channel_id)
                     elif text == "/set_channel":
                         set_channel_1(chat_id, user_id)
                     elif text == "/send_timed":
-                        create_timed_post_or_poll(chat_id, channel_id)
+                        create_timed_post_or_poll_1(chat_id, channel_id)
                     elif text == "/exit":
                         reset_state()
                     else:
@@ -726,8 +734,24 @@ def main():
                                 bot_state.params[5].append([text, 0])
                                 bot_state.params[4] += 1
                                 create_poll_4(chat_id, channel_id, bot_state.params[2], bot_state.params[4])
-                        # elif bot_state.state == "get_date":
-                        # elif bot_state.state == "get_fwd":
+                        elif bot_state.state == "get_date":
+                            dates = get_date(chat_id, text)
+                            if dates is not None:
+                                if bot_state.next == "gms_params":
+                                    gms_params(chat_id, channel_id, dates[0], dates[1])
+                                elif bot_state.next == "gcs_params":
+                                    gcs_params(chat_id, channel_id, bot_state.params[0], dates[0], dates[1])
+                        elif bot_state.state == "get_date_time":
+                            time = get_date_time(chat_id, text)
+                            if time is not None:
+                                if bot_state.next == "create_timed_post_or_poll_2":
+                                    create_timed_post_or_poll_2(chat_id, channel_id, time)
+                        elif bot_state.state == "get_fwd":
+                            mid = get_fwd(chat_id, upd)
+                            if mid is not None:
+                                if bot_state.next == "get_post_statistics_2":
+                                    get_post_statistics_2(chat_id, channel_id, mid, bot_state.params[0],
+                                                          bot_state.params[1], bot_state.params[2])
                 elif upd_type == 'message_callback':
                     chat_callback(chat_id, channel_id, bot.get_callback_id(upd), bot.get_payload(upd))
                 if chat_info['type'] == 'chat':

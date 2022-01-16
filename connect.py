@@ -156,7 +156,7 @@ def get_channel_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
     return get_channel_stat_from_to(chat_id, 'week', fr, to)
 
 
-def get_channel_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_channel_stat_by_month_from_to(chat_id: int, fr = 0, to = 2147483647):
     """
     Views stat for all posts from channel with precision month.
     You can add 'from' and 'to'.
