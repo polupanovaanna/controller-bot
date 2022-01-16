@@ -33,10 +33,6 @@ def reset_state():
     bot_state.params = []
 
 
-"""
-get_integer -- у функции get_integer
-"""
-
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
             {"name": '/poll_statistics', "description": "Результаты опроса"},
             {"name": '/close_poll', "description": "Закрытие опроса"},
@@ -264,12 +260,13 @@ def set_channel_1(chat_id, user_id):
         bot_state.params = [len(channels), channels]
 
 
-def set_channel_2(chat_id, channel_id, channels, num):
+def set_channel_2(chat_id, channel_id, user_id, channels, num):
     msg = "Канал был успешно установлен!"
     bot.send_message(msg, chat_id)
-    # TODO сделать if через бд что потока для канала еще не было
-    th = Thread(target=update_channel_statistics, args=channel_id)
-    th.start()
+    set_active_channel(user_id, channel_id)
+    if not exists_chat(channel_id):
+        th = Thread(target=update_channel_statistics, args=channel_id)
+        th.start()
     return channels[num - 1]['chat_id']
 
 
@@ -635,7 +632,7 @@ def create_timed_post_or_poll_2(chat_id, channel_id, vdt_sec):
 
     msg = "Вы хотите опубликовать пост или опрос?"
     buttons = [bot.button_callback("Пост", "timed~~post~~" + str(timeto), intent='default'),
-              bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
+               bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
     bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
 
 
@@ -664,17 +661,17 @@ def main():
 
             if not chat_info:
                 continue
-            elif chat_info['type'] == 'channel':
-                if upd_type == "message_callback":
-                    poll_callback(bot.get_callback_id(upd), bot.get_payload(upd), user_id, bot.get_name(upd))
+            elif chat_info['type'] == 'channel' and upd_type == "message_callback":
+                poll_callback(bot.get_callback_id(upd), bot.get_payload(upd), user_id, bot.get_name(upd))
             else:
                 if upd_type == "bot_started":
                     bot.send_message(greeting_text, chat_id)
+                    set_active_channel(user_id, -1)
+                channel_id = get_active_channel(user_id)
                 if channel_id == -1 and bot_state.next != "set_channel_2":
                     set_channel_1(chat_id, user_id)
                     continue
                 elif upd_type == "message_created":
-                    #TODO проверить user_id и поставить канал в соответствие
                     text = bot.get_text(upd)
                     if text == "/create_poll":
                         create_poll_1(chat_id, channel_id)
@@ -702,7 +699,7 @@ def main():
                             if bot_state.next == "set_channel_2":
                                 ans = get_integer(chat_id, bot_state.params[0], upd)
                                 if ans is not None:
-                                    channel_id = set_channel_2(chat_id, channel_id, bot_state.params[1], ans)
+                                    set_channel_2(chat_id, channel_id, user_id, bot_state.params[1], ans)
                                     reset_state()
                             elif bot_state.next == "create_poll_3":
                                 ans = get_integer(chat_id, 100000, upd)
