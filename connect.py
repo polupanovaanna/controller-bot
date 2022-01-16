@@ -12,6 +12,10 @@ conn = psycopg2.connect(
 conn.autocommit = True
 cur = conn.cursor()
 
+
+#def create_
+
+
 def create_user_stat():
     """
     Private
@@ -20,6 +24,12 @@ def create_user_stat():
     cur.execute(
         "CREATE TABLE user_stat (timestamp BIGINT, "
         "user_cnt BIGINT, chat_id BIGINT);")
+
+
+def exists_chat(chat_id: int):
+    cur.execute(f"SELECT EXISTS(SELECT 1 FROM user_stat WHERE chat_id={chat_id});")
+    return cur.fetchone()[0]
+    
 
 
 def get_all_chats():
@@ -405,4 +415,5 @@ def create_all():
     create_user_stat()
 
 if __name__ == "__main__":
+    print(exists_chat(312))
     close()
