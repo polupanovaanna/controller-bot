@@ -13,7 +13,39 @@ conn.autocommit = True
 cur = conn.cursor()
 
 
-#def create_
+def create_channel_list():
+    """
+    Private
+    channel - user
+    """
+    cur.execute(
+        "CREATE TABLE user_active_channel (user_id BIGINT, "
+        "chat_id BIGINT);")
+
+
+def get_active_channel(user_id: int):
+    cur.execute(f"SELECT chat_id FROM user_active_channel WHERE user_id={user_id};")
+    res = cur.fetchone()
+    if res == None:
+        return None
+    return res[0]
+
+
+def check_user(user_id: int):
+    """
+    Private
+    """
+    cur.execute(f"SELECT EXISTS(SELECT 1 FROM user_active_channel WHERE user_id={user_id});")
+    return cur.fetchone()[0]
+
+
+def set_active_channel(user_id: int, chat_id: int):
+    if check_user(user_id):
+        cur.execute(f"UPDATE user_active_channel SET chat_id={chat_id} WHERE user_id={user_id};")
+        return
+
+    cur.execute("INSERT INTO user_active_channel (user_id, chat_id) VALUES (%s, %s);",
+                (user_id, chat_id))
 
 
 def create_user_stat():
@@ -413,7 +445,11 @@ def create_all():
     create_poll_info()
     create_channel_to_post()
     create_user_stat()
+    create_channel_list()
 
 if __name__ == "__main__":
-    print(exists_chat(312))
+    set_active_channel(0, 0)
+    print(get_active_channel(0))
+    set_active_channel(0, 5)
+    print(get_active_channel(0))
     close()
