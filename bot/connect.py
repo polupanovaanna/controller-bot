@@ -1,7 +1,9 @@
+import time
+
 import psycopg2
 from config import host, user, password, db_name
 from time import time as tm
-
+time.sleep(10)
 conn = psycopg2.connect(
     host=host,
     user=user,
