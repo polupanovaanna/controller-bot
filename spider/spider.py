@@ -181,7 +181,6 @@ visited_channels_lock = threading.Lock()
 
 
 def start_spider():
-    spider_db.connect()
     processed_chats = spider_db.get_all_chats()
     for i in processed_chats:
         link = get_chat_link(i[0])
@@ -206,4 +205,5 @@ def start_spider():
 
 
 if __name__ == "__main__":
+    sleep(10)
     start_spider()

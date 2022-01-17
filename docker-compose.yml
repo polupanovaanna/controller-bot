@@ -15,5 +15,8 @@ services:
       - "5432:5432"
     volumes:
       - database-data:/var/lib/postgresql/data/
+  spider:
+    build: ./spider/
+    container_name: "mention_counter"
 volumes:
   database-data:

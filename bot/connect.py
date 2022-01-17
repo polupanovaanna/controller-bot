@@ -3,7 +3,7 @@ import time
 import psycopg2
 from config import host, user, password, db_name
 from time import time as tm
-time.sleep(10)
+
 conn = psycopg2.connect(
     host=host,
     user=user,
@@ -63,7 +63,6 @@ def create_user_stat():
 def exists_chat(chat_id: int):
     cur.execute(f"SELECT EXISTS(SELECT 1 FROM user_stat WHERE chat_id={chat_id});")
     return cur.fetchone()[0]
-    
 
 
 def get_all_chats():
@@ -99,21 +98,21 @@ def add_chat_stat(time: int, count: int, chat_id: int):
                 (time, count - old, chat_id))
 
 
-def get_chat_stat_by_day_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_chat_stat_by_day_from_to(chat_id: int, fr=0, to=2147483647):
     """
     TODO
     """
     return get_chat_stat(chat_id, 'day', fr, to)
 
 
-def get_chat_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_chat_stat_by_week_from_to(chat_id: int, fr=0, to=2147483647):
     """
     TODO
     """
     return get_chat_stat(chat_id, 'week', fr, to)
 
 
-def get_chat_stat_by_month_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_chat_stat_by_month_from_to(chat_id: int, fr=0, to=2147483647):
     """
     TODO
     """
@@ -125,7 +124,8 @@ def get_chat_stat(chat_id: int, wtf: str, fr: int, to: int):
     Private
     user_stat by wtf.
     """
-    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(timestamp)::date) AS month, SUM(user_cnt) AS user_sum FROM user_stat WHERE chat_id={chat_id} GROUP BY month ORDER BY month;")
+    cur.execute(
+        f"SELECT DATE_TRUNC('{wtf}',to_timestamp(timestamp)::date) AS month, SUM(user_cnt) AS user_sum FROM user_stat WHERE chat_id={chat_id} GROUP BY month ORDER BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -184,7 +184,7 @@ def get_post_stat_by_month_db(id: int):
     return get_post_stat_by_db(id, 'month')
 
 
-def get_channel_stat_by_day_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_channel_stat_by_day_from_to(chat_id: int, fr=0, to=2147483647):
     """
     Views stat for all posts from channel with precision day.
     You can add 'from' and 'to'.
@@ -192,7 +192,7 @@ def get_channel_stat_by_day_from_to(chat_id: int, fr = 0, to = 2147483647):
     return get_channel_stat_from_to(chat_id, 'day', fr, to)
 
 
-def get_channel_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_channel_stat_by_week_from_to(chat_id: int, fr=0, to=2147483647):
     """
     Views stat for all posts from channel with precision week.
     You can add 'from' and 'to'.
@@ -200,7 +200,7 @@ def get_channel_stat_by_week_from_to(chat_id: int, fr = 0, to = 2147483647):
     return get_channel_stat_from_to(chat_id, 'week', fr, to)
 
 
-def get_channel_stat_by_month_from_to(chat_id: int, fr = 0, to = 2147483647):
+def get_channel_stat_by_month_from_to(chat_id: int, fr=0, to=2147483647):
     """
     Views stat for all posts from channel with precision month.
     You can add 'from' and 'to'.
@@ -213,7 +213,8 @@ def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
     Private
     Returns count of new views between fr and to in channel, with precision wtf.
     """
-    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.message_id=channel_post.message_id WHERE channel_post.chat_id={chat_id} AND post_stat.time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
+    cur.execute(
+        f"SELECT DATE_TRUNC('{wtf}',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.message_id=channel_post.message_id WHERE channel_post.chat_id={chat_id} AND post_stat.time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -224,21 +225,21 @@ def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
     return res
 
 
-def get_post_stat_by_day_from_to(message_id: str, fr = 0, to = 2147483647):
+def get_post_stat_by_day_from_to(message_id: str, fr=0, to=2147483647):
     """
     Returns count of new views between fr and to for post, with precision day.
     """
     return get_post_stat_from_to(message_id, 'day', fr, to)
 
 
-def get_post_stat_by_week_from_to(message_id: str, fr = 0, to = 2147483647):
+def get_post_stat_by_week_from_to(message_id: str, fr=0, to=2147483647):
     """
     Returns count of new views between fr and to for post, with precision week.
     """
     return get_post_stat_from_to(message_id, 'week', fr, to)
 
 
-def get_post_stat_by_month_from_to(message_id: str, fr = 0, to = 2147483647):
+def get_post_stat_by_month_from_to(message_id: str, fr=0, to=2147483647):
     """
     Returns count of new views between fr and to for post, with precision month.
     """
@@ -250,7 +251,8 @@ def get_post_stat_from_to(message_id: str, wtf: str, fr, to):
     Private
     Returns count of new views between fr and to for post, with precision wtf.
     """
-    cur.execute(f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id='{message_id}' AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
+    cur.execute(
+        f"SELECT DATE_TRUNC('day',to_timestamp(time)::date) AS month, SUM(views) AS views_sum FROM post_stat WHERE message_id='{message_id}' AND time BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -382,7 +384,7 @@ def update_votes(id: int, index: int, chel_id: int, name: str):
     """
     if is_voted(chel_id, id):
         return
-    
+
     cur.execute("SELECT * FROM poll_info WHERE id = {};".format(id))
     res = cur.fetchone()
 
@@ -448,6 +450,7 @@ def create_all():
     create_channel_to_post()
     create_user_stat()
     create_channel_list()
+
 
 if __name__ == "__main__":
     set_active_channel(0, 0)
