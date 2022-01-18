@@ -123,7 +123,7 @@ def get_chat_stat(chat_id: int, wtf: str, fr: int, to: int):
     Private
     user_stat by wtf.
     """
-    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(timestamp)::date) AS month, SUM(user_cnt) AS user_sum FROM user_stat WHERE chat_id={chat_id} GROUP BY month ORDER BY month;")
+    cur.execute(f"SELECT DATE_TRUNC('{wtf}',to_timestamp(timestamp)::date) AS month, SUM(user_cnt) AS user_sum FROM user_stat WHERE chat_id={chat_id} AND timestamp BETWEEN {fr} AND {to} GROUP BY month ORDER BY month;")
 
     res = []
     tmp = cur.fetchone()
@@ -448,8 +448,6 @@ def create_all():
     create_channel_list()
 
 if __name__ == "__main__":
-    set_active_channel(0, 0)
-    print(get_active_channel(0))
-    set_active_channel(0, 5)
-    print(get_active_channel(0))
+    add_chat_stat(214748364, 15, 0)
+    print(get_chat_stat_by_day_from_to(0, 1000001))
     close()
