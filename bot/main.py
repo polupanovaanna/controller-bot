@@ -49,6 +49,7 @@ def draw_statistics(dates, param, text, filename):
     plt.ylabel(text)
     plt.xlabel("Дата")
     plt.savefig(filename)
+    plt.close()
 
 
 def convert_date_to_ms(date):
@@ -323,7 +324,7 @@ def gms_params(chat_id, channel_id, date1, date2):
 def gms_get_stat(chat_id, channel_id, time_gap, fr, to):
     res = []
     if time_gap == "day":
-        res = get_chat_stat_by_day_from_to(channel_id, fr, 2147483647)
+        res = get_chat_stat_by_day_from_to(channel_id, fr, int(to))
     elif time_gap == "week":
         res = get_chat_stat_by_week_from_to(channel_id, fr, int(to))
     elif time_gap == "month":
