@@ -304,7 +304,7 @@ def create_poll_info():
     """
     cur.execute(
         "CREATE TABLE poll_info (id BIGINT PRIMARY KEY NOT NULL, "
-        "poll_name varchar, answers varchar ARRAY, voted BIGINT ARRAY, closed boolean);")
+        "poll_name varchar, answers varchar ARRAY, voted BIGINT ARRAY, closed boolean, chat_id BIGINT);")
 
 
 def create_poll_voted():
@@ -366,7 +366,7 @@ def convert_poll_results(answers_):
     return answers, voted
 
 
-def add_poll(id: int, name: str, answers_):
+def add_poll(id: int, name: str, answers_, chat_id: int):
     """
     Call on create poll.
 
@@ -374,8 +374,8 @@ def add_poll(id: int, name: str, answers_):
     """
     answers, voted = convert_poll_results(answers_)
 
-    cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed) VALUES (%s, %s, %s, %s, FALSE);",
-                (id, name, answers, voted))
+    cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed, chat_id) VALUES (%s, %s, %s, %s, FALSE, %s);",
+                (id, name, answers, voted, chat_id))
 
 
 def update_votes(id: int, index: int, chel_id: int, name: str):
@@ -425,11 +425,11 @@ def get_poll_statistics_db(id: int):
     return list(zip(res[2], res[3]))
 
 
-def get_all_polls():
+def get_all_polls(chat_id: int):
     """
     Return [(id: int, name: str), ...]
     """
-    cur.execute(f"SELECT id, poll_name FROM poll_info WHERE closed=FALSE;")
+    cur.execute(f"SELECT id, poll_name FROM poll_info WHERE closed=FALSE AND chat_id={chat_id};")
 
     tmp = cur.fetchone()
     res = []
