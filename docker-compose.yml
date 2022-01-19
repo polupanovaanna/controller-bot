@@ -8,7 +8,7 @@ services:
     container_name: "database"
     environment:
       - POSSTGRES_USER=postgres
-      - POSTGRESQL_DATABASE=database
+      - POSTGRESQL_DATABASE=bot_database
       - POSTGRESQL_PASSWORD=123
     ports:
       - "5432:5432"
