@@ -33,10 +33,6 @@ def reset_state():
     bot_state.params = []
 
 
-"""
-get_integer -- у функции get_integer
-"""
-
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
             {"name": '/poll_statistics', "description": "Результаты опроса"},
             {"name": '/close_poll', "description": "Закрытие опроса"},
@@ -53,6 +49,7 @@ def draw_statistics(dates, param, text, filename):
     plt.ylabel(text)
     plt.xlabel("Дата")
     plt.savefig(filename)
+    plt.close()
 
 
 def convert_date_to_ms(date):
@@ -264,12 +261,13 @@ def set_channel_1(chat_id, user_id):
         bot_state.params = [len(channels), channels]
 
 
-def set_channel_2(chat_id, channel_id, channels, num):
+def set_channel_2(chat_id, user_id, channels, num):
     msg = "Канал был успешно установлен!"
     bot.send_message(msg, chat_id)
-    # TODO сделать if через бд что потока для канала еще не было
-    th = Thread(target=update_channel_statistics, args=channel_id)
-    th.start()
+    set_active_channel(user_id, channels[num-1]['chat_id'])
+    if not exists_chat(channels[num-1]['chat_id']):
+        th = Thread(target=update_channel_statistics, args=[channels[num-1]['chat_id']])
+        th.start()
     return channels[num - 1]['chat_id']
 
 
@@ -326,12 +324,12 @@ def gms_params(chat_id, channel_id, date1, date2):
 def gms_get_stat(chat_id, channel_id, time_gap, fr, to):
     res = []
     if time_gap == "day":
-        res = get_chat_stat_by_day_from_to(channel_id, fr, to)
+        res = get_chat_stat_by_day_from_to(channel_id, fr, int(to))
     elif time_gap == "week":
-        res = get_chat_stat_by_week_from_to(channel_id, fr, to)
+        res = get_chat_stat_by_week_from_to(channel_id, fr, int(to))
     elif time_gap == "month":
-        res = get_chat_stat_by_month_from_to(channel_id, fr, to)
-    send_stat_pic(chat_id, "Количество просмотров", res)
+        res = get_chat_stat_by_month_from_to(channel_id, fr, int(to))
+    send_stat_pic(chat_id, "Количество новых пользователей", res)
 
 
 def get_post_statistics_1(chat_id, channel_id, time_gap, fr, to):
@@ -460,6 +458,7 @@ def create_poll_3(chat_id, channel_id):
     bot.send_message("Введите вариант ответа №" + str(1), chat_id)
     bot_state.state = "get_text"
     bot_state.next = "create_poll_4"
+    bot_state.params[4] += 1
 
 
 def create_poll_4(chat_id, channel_id, number_of_ans, i):
@@ -635,7 +634,7 @@ def create_timed_post_or_poll_2(chat_id, channel_id, vdt_sec):
 
     msg = "Вы хотите опубликовать пост или опрос?"
     buttons = [bot.button_callback("Пост", "timed~~post~~" + str(timeto), intent='default'),
-              bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
+               bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
     bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
 
 
@@ -664,17 +663,17 @@ def main():
 
             if not chat_info:
                 continue
-            elif chat_info['type'] == 'channel':
-                if upd_type == "message_callback":
-                    poll_callback(bot.get_callback_id(upd), bot.get_payload(upd), user_id, bot.get_name(upd))
+            elif chat_info['type'] == 'channel' and upd_type == "message_callback":
+                poll_callback(bot.get_callback_id(upd), bot.get_payload(upd), user_id, bot.get_name(upd))
             else:
                 if upd_type == "bot_started":
                     bot.send_message(greeting_text, chat_id)
+                    set_active_channel(user_id, -1)
+                channel_id = get_active_channel(user_id)
                 if channel_id == -1 and bot_state.next != "set_channel_2":
                     set_channel_1(chat_id, user_id)
                     continue
                 elif upd_type == "message_created":
-                    #TODO проверить user_id и поставить канал в соответствие
                     text = bot.get_text(upd)
                     if text == "/create_poll":
                         create_poll_1(chat_id, channel_id)
@@ -702,7 +701,7 @@ def main():
                             if bot_state.next == "set_channel_2":
                                 ans = get_integer(chat_id, bot_state.params[0], upd)
                                 if ans is not None:
-                                    channel_id = set_channel_2(chat_id, channel_id, bot_state.params[1], ans)
+                                    set_channel_2(chat_id, user_id, bot_state.params[1], ans)
                                     reset_state()
                             elif bot_state.next == "create_poll_3":
                                 ans = get_integer(chat_id, 100000, upd)
@@ -718,7 +717,6 @@ def main():
                                 if num is not None:
                                     get_poll_statistics_2(chat_id, bot_state.params[0], num)
                             elif bot_state.next == "get_poll_statistics_3":
-                                print(bot_state.params[1])
                                 num = get_integer(chat_id, bot_state.params[2], upd)
                                 if num is not None:
                                     get_poll_statistics_3(chat_id, bot_state.params[0], bot_state.params[1], num)
@@ -732,7 +730,6 @@ def main():
                                 create_poll_2(chat_id, channel_id)
                             elif bot_state.next == "create_poll_4":
                                 bot_state.params[5].append([text, 0])
-                                bot_state.params[4] += 1
                                 create_poll_4(chat_id, channel_id, bot_state.params[2], bot_state.params[4])
                         elif bot_state.state == "get_date":
                             dates = get_date(chat_id, text)
