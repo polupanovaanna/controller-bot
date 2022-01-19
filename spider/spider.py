@@ -70,7 +70,11 @@ def get_last_message_time(chat_id: int):
 
 def dfs():
     global channels_queue, visited_channels
-    chat_link = channels_queue.get()
+    try:
+        chat_link = channels_queue.get(timeout=200)
+    except queue.Empty:
+        add_all_chats()
+        dfs()
     added_channels = set()
     regexpr = r"(tt\.me/)([A-za-z0-9]+)"
     current_chat_id = get_chat_id(chat_link)
@@ -97,7 +101,6 @@ def dfs():
     need_check = True
     while need_check and len(messages) > 0:
         for message in messages:
-            status = message
             timestamp = message["timestamp"]
             last_time = min(timestamp, last_time)
             if (timestamp <= first_time):
@@ -107,8 +110,9 @@ def dfs():
             for i in matches:
                 if i[1] == chat_link:
                     continue
-                add_mention(i[1])
                 new_chat_id = get_chat_id(i[1])
+                if (new_chat_id not in added_channels):
+                    add_mention(i[1])
                 if (new_chat_id == FAIL):
                     print("fail to get chat id")
                     continue
@@ -124,8 +128,9 @@ def dfs():
                     for i in match:
                         if (i[1] == chat_link):
                             continue
-                        add_mention(i[1])
                         new_chat_id = get_chat_id(i[1])
+                        if (new_chat_id not in added_channels):
+                            add_mention(i[1])
                         if (new_chat_id == FAIL):
                             continue
                         if new_chat_id not in visited_channels and new_chat_id not in added_channels:
@@ -156,7 +161,6 @@ def get_links():
         blocks = bs.find_all("td", attrs={"class": "tbl_main_td"})
         channels = []
         for i in range(len(blocks)):
-
             block = blocks[i].find("a", attrs={"target": "_blank"})
             if (block is not None):
                 channels.append(block.get("href")[4:-1])
@@ -180,11 +184,15 @@ channels_queue = queue.Queue()
 visited_channels_lock = threading.Lock()
 
 
-def start_spider():
+def add_all_chats():
     processed_chats = spider_db.get_all_chats()
     for i in processed_chats:
         link = get_chat_link(i[0])
         channels_queue.put(link)
+
+
+def start_spider():
+    add_all_chats()
     links = get_links()
     for i in links:
         channels_queue.put(i)

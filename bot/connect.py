@@ -3,7 +3,7 @@ import time
 import psycopg2
 from config import host, user, password, db_name
 from time import time as tm
-
+time.sleep(10)
 conn = psycopg2.connect(
     host=host,
     user=user,
@@ -452,9 +452,22 @@ def create_all():
     create_channel_list()
 
 
+def get_channel_mentions(chat_id: int):
+    """
+    :returns mention count for channel and 0 if channel is not mentioned
+    """
+    cur.execute("SELECT mentions from mention_info where channel_id={}".format(chat_id))
+    res = cur.fetchone()
+    if res is not None:
+        return res
+    else:
+        return 0
+
+
 if __name__ == "__main__":
     set_active_channel(0, 0)
     print(get_active_channel(0))
+    print(get_channel_mentions(12345))
     set_active_channel(0, 5)
     print(get_active_channel(0))
     close()
