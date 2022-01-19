@@ -41,6 +41,7 @@ commands = [{"name": '/create_poll', "description": "Создание опрос
             {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
             {"name": '/set_channel', "description": "Выбор канала для работы с ботом"},
             {"name": '/send_timed', "description": "Отправка отложенного поста или опроса"},
+            {"name": '/get_channel_mentions', "description": "Получение числа упоминаний канала"},
             {"name": '/exit', "description": "Возвращает бота в исходное состояние"}]
 
 
@@ -658,6 +659,13 @@ def create_timed_post(chat_id, channel_id, timeto):
     th.start()
 
 
+def channel_mentions_info(chat_id, channel_id):
+    msg = "Данный канал был упомянут в "
+    msg += str(get_channel_mentions(channel_id))
+    msg += " источниках"
+    bot.send_message(msg, chat_id)
+
+
 def main():
     channel_id = -1
     bot.edit_bot_info("TESTbot", commands=commands)
@@ -700,6 +708,8 @@ def main():
                         set_channel_1(chat_id, user_id)
                     elif text == "/send_timed":
                         create_timed_post_or_poll_1(chat_id, channel_id)
+                    elif text == "/get_channel_mentions":
+                        channel_mentions_info(chat_id, channel_id)
                     elif text == "/exit":
                         reset_state()
                     else:
