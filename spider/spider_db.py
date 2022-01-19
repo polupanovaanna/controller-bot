@@ -21,17 +21,22 @@ def connect():
 
 
 def create_spider_db():
-    cur.execute(
-        f"CREATE TABLE {table_name} (channel_id bigint PRIMARY KEY NOT NULL, last_checked_message bigint , first_checked_message bigint , mentions integer);")
+    try:
+        cur.execute(
+            f"CREATE TABLE {table_name} (channel_id bigint PRIMARY KEY NOT NULL, last_checked_message bigint , first_checked_message bigint , mentions integer);")
+    except:
+        pass
 
 
 def add_channel(channel_id, time):
-    #try:
-        cur.execute(
-            f"INSERT INTO {table_name} (channel_id, last_checked_message, first_checked_message, mentions) values (%s, %s, %s, %s);",
-            (channel_id, time, time, 0))
-   # except:
-    #    pass
+    # try:
+    cur.execute(
+        f"INSERT INTO {table_name} (channel_id, last_checked_message, first_checked_message, mentions) values (%s, %s, %s, %s);",
+        (channel_id, time, time, 0))
+
+
+# except:
+#    pass
 
 
 def add_mention(channel_id):
@@ -87,6 +92,7 @@ def get_mentions(chat_id):
         return res
     else:
         return -1
+
 
 connect()
 create_spider_db()
