@@ -269,6 +269,7 @@ def set_channel_2(chat_id, user_id, channels, num):
     if not exists_chat(channels[num-1]['chat_id']):
         th = Thread(target=update_channel_statistics, args=[channels[num-1]['chat_id']])
         th.start()
+    reset_state()
     return channels[num - 1]['chat_id']
 
 
@@ -280,9 +281,9 @@ def update_channel_statistics(channel_id):
     while True:
         messages = get_all_messages(channel_id)
         for msg in messages['messages']:
-            add_post(int(datetime.now().timestamp() * 1000), msg['stat']['views'], msg['body']['mid'], channel_id)
+            add_post(int(datetime.now().timestamp()), msg['stat']['views'], msg['body']['mid'], channel_id)
         cnt = bot.get_chat(channel_id)['participants_count']
-        add_chat_stat(int(datetime.now().timestamp() * 1000), cnt, channel_id)
+        add_chat_stat(int(datetime.now().timestamp()), cnt, channel_id)
         time.sleep(86400)
 
 
@@ -331,6 +332,7 @@ def gms_get_stat(chat_id, channel_id, time_gap, fr, to):
     elif time_gap == "month":
         res = get_chat_stat_by_month_from_to(channel_id, fr, int(to))
     send_stat_pic(chat_id, "Количество новых пользователей", res)
+    reset_state()
 
 
 def get_post_statistics_1(chat_id, channel_id, time_gap, fr, to):
@@ -350,6 +352,7 @@ def get_post_statistics_2(chat_id, channel_id, mid, time_gap, fr, to):
     if time_gap == "month":
         res = get_post_stat_by_month_from_to(mid, fr, to)
     send_stat_pic(chat_id, "Количество просмотров", res)
+    reset_state()
 
 
 def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
@@ -361,6 +364,7 @@ def get_ch_statictics(chat_id, channel_id, time_gap, fr, to):
     if time_gap == "month":
         res = get_channel_stat_by_month_from_to(channel_id, fr, to)
     send_stat_pic(chat_id, "Количество просмотров", res)
+    reset_state()
 
 
 def get_channel_statistics(chat_id, channel_id):
@@ -433,6 +437,7 @@ def gcs_params(chat_id, channel_id, is_channel, date1, date2):
                bot.button_callback("Неделя", strings[1], intent='default'),
                bot.button_callback("Месяц", strings[2], intent='default')]
     bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
+    reset_state()
 
 
 def create_poll_1(chat_id, channel_id, timeto=0):
@@ -485,6 +490,7 @@ def create_poll_5(chat_id, channel_id, poll_text_main, poll_id, answers, timeto)
     reset_state()
     th = Thread(target=send_poll_to_channel, args=(channel_id, poll_text_main, bot.attach_buttons(buttons), timeto))
     th.start()
+    reset_state()
     return
 
 
@@ -565,6 +571,7 @@ def get_poll_statistics_3(chat_id, opened_polls, num, i):
         bot.send_message('За вариант №' + str(i) + ' никто не проголосовал', chat_id)
         return
     bot.send_message('За вариант №' + str(i) + ' проголосовали: ' + msg, chat_id)
+    reset_state()
 
 
 def poll_callback(callback_id, callback_payload, user_id, username):
@@ -597,7 +604,7 @@ def clear_channel_followers_2(chat_id, channel_id, duration):
         if members is None:
             break
         for mem in members['members']:
-            if int(datetime.now().timestamp() * 1000) - duration * 24 * 60 * 60 * 1000 > mem['last_activity_time']:
+            if int(datetime.now().timestamp()) - duration * 24 * 60 * 60 > mem['last_activity_time']:
                 bot.remove_member(channel_id, mem['user_id'])
         if 'marker' not in members:
             break
@@ -637,6 +644,7 @@ def create_timed_post_or_poll_2(chat_id, channel_id, vdt_sec):
     buttons = [bot.button_callback("Пост", "timed~~post~~" + str(timeto), intent='default'),
                bot.button_callback("Опрос", "timed~~poll~~" + str(timeto), intent='default')]
     bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
+    reset_state()
 
 
 def create_timed_post(chat_id, channel_id, timeto):
