@@ -255,6 +255,7 @@ def set_channel_1(chat_id, user_id):
         i = 1
         for ch in channels:
             msg += (str(i) + ". " + ch['title'] + "\n")
+            i += 1
         bot.send_message(msg, chat_id)
         bot_state.state = "get_integer"
         bot_state.next = "set_channel_2"
@@ -473,7 +474,7 @@ def create_poll_4(chat_id, channel_id, number_of_ans, i):
 
 
 def create_poll_5(chat_id, channel_id, poll_text_main, poll_id, answers, timeto):
-    add_poll(poll_id, poll_text_main, answers)
+    add_poll(poll_id, poll_text_main, answers, channel_id)
     buttons = []
     i = 1
     for var in answers:
@@ -492,11 +493,11 @@ def send_poll_to_channel(channel_id, text, attachments, timeto):
     bot.send_message(text, channel_id, attachments=attachments)
 
 
-def close_poll_1(chat_id):
+def close_poll_1(chat_id, channel_id):
     """
     Закрытие опроса
     """
-    opened_polls = get_all_polls()
+    opened_polls = get_all_polls(channel_id)
     if len(opened_polls) == 0:
         msg = "В данный момент в канале нет открытых опросов\n"
         bot.send_message(msg, chat_id)
@@ -520,14 +521,14 @@ def close_poll_2(chat_id, opened_polls, num):
     reset_state()
 
 
-def get_poll_statistics_1(chat_id):
+def get_poll_statistics_1(chat_id, channel_id):
     """
     Получение результатов опроса: сколько голосов за каждый вариант. По запросу можно увидеть, кто голосовал
     """
     msg = "Выберите, по какому опросу вы хотите получить статистику:\n"
     i = 1
     tmp = []
-    opened_polls = get_all_polls()
+    opened_polls = get_all_polls(channel_id)
     for poll in opened_polls:
         msg += ("№" + str(i) + ". " + str(poll[1]) + "\n")
         i += 1
@@ -678,9 +679,9 @@ def main():
                     if text == "/create_poll":
                         create_poll_1(chat_id, channel_id)
                     elif text == "/close_poll":
-                        close_poll_1(chat_id)
+                        close_poll_1(chat_id, channel_id)
                     elif text == "/poll_statistics":
-                        get_poll_statistics_1(chat_id)
+                        get_poll_statistics_1(chat_id, channel_id)
                     elif text == "/get_channel_views_statistics":
                         get_channel_statistics(chat_id, channel_id)
                     elif text == "/get_channel_members_statistics":
