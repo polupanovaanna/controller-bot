@@ -99,6 +99,29 @@ def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50
     return messages
 
 
+def message_exists(channel_id, mid):
+    messages = []
+    method = 'messages'
+    params = [
+        ('access_token', token),
+        ('chat_id', channel_id),
+        ('message_ids', [mid])]
+    try:
+        response = requests.get(url + method, params)
+        if response.status_code == 200:
+            messages = response.json()
+        else:
+            logger.error("Error get chat info: {}".format(response.status_code))
+            messages = None
+    except Exception as e:
+        logger.error("Error connect get chat info: %s.", e)
+        chat = None
+    if len(messages) is not 0:
+        return True
+    else:
+        return False
+
+
 def get_all_channel_members(channel_id, marker=None):
     """
     Дополнение к библиотеке. Возвращает список всех участников канала.
@@ -391,6 +414,14 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
                 gcs_get_stat_1(chat_id, channel_id, True)
             else:
                 gcs_get_stat_1(chat_id, channel_id, False)
+        elif command[0] == "setup":
+            if command[1] == "create":
+                create_timed_post_or_poll_1(chat_id, channel_id)
+            if command[1] == "delete":
+                delete_timed_post_1(chat_id)
+            if command[1] == "pin":
+                pin_timed_post_1(chat_id)
+
     if len(command) == 3:
         if command[0] == "timed":
             if command[1] == "poll":
@@ -659,6 +690,83 @@ def create_timed_post(chat_id, channel_id, timeto):
     th.start()
 
 
+def delete_timed_post_1(chat_id):
+    msg = "Перешлите боту сообщение, которое хотите удалить" \
+          "Для выхода выберите команду /exit"
+    bot.send_message(msg, chat_id)
+    bot_state.state = "get_fwd"
+    bot_state.next = "delete_timed_post_2"
+
+
+def delete_timed_post_2(chat_id, post_id):
+    msg = "Введите дату и время, в которое пост будет удален в канал в формате ДД.ММ.ГГГГ ЧЧ:ММ, например" \
+          " 11.10.2024 16:33 \n" \
+          "Для выхода выберите команду /exit"
+    bot.send_message(msg, chat_id)
+    bot_state.state = "get_date_time"
+    bot_state.next = "delete_timed_post_3"
+    bot_state.params.append(post_id)
+
+
+def delete_timed_post_3(chat_id, channel_id, post_id, dtm):
+    dt_now = datetime.now().timestamp()
+    timeto = int(dtm) - int(dt_now)
+    if timeto < 0:
+        timeto = 0
+    bot.send_message("Ваш пост будет удален в указанное время", chat_id)
+    th = Thread(target=delete_post, args=(channel_id, post_id,))
+    th.start()
+
+
+def delete_post(channel_id, timeto, post_id):
+    time.sleep(timeto)
+    if message_exists(channel_id, post_id):
+        bot.delete_message(post_id)
+
+
+def pin_timed_post_1(chat_id):
+    msg = "Перешлите боту сообщение, которое хотите закрепить" \
+          "Для выхода выберите команду /exit"
+    bot.send_message(msg, chat_id)
+    bot_state.state = "get_fwd"
+    bot_state.next = "pin_timed_post_2"
+
+
+def pin_timed_post_2(chat_id, post_id):
+    msg = "Введите дату и время, в которое пост будет удален в канал в формате ДД.ММ.ГГГГ ЧЧ:ММ, например" \
+          " 11.10.2024 16:33 \n" \
+          "Для выхода выберите команду /exit"
+    bot.send_message(msg, chat_id)
+    bot_state.state = "get_date_time"
+    bot_state.next = "pin_timed_post_3"
+    bot_state.params.append(post_id)
+
+
+def pin_timed_post_3(chat_id, channel_id, post_id, dtm):
+    dt_now = datetime.now().timestamp()
+    timeto = int(dtm) - int(dt_now)
+    if timeto < 0:
+        timeto = 0
+    bot.send_message("Ваш пост будет закреплен в указанное время", chat_id)
+    th = Thread(target=pin_post, args=(channel_id, post_id,))
+    th.start()
+
+
+def pin_post(channel_id, timeto, post_id):
+    time.sleep(timeto)
+    if message_exists(channel_id, post_id):
+        bot.pin_message(channel_id, post_id)
+
+
+def setup_timed(chat_id):
+    msg = "Выберите, хотите вы создать отложенный пост/опрос, удалить пост или закрепить пост"
+    bot.send_message(msg, chat_id)
+    buttons = [bot.button_callback("Создание", "setup~~create", intent='default'),
+               bot.button_callback("Удаление", "setup~~delete", intent='default'),
+               bot.button_callback("Закрепление", "setup~~pin", intent='default')]
+    bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
+
+
 def channel_mentions_info(chat_id, channel_id):
     msg = "Данный канал был упомянут в "
     msg += str(get_channel_mentions(channel_id))
@@ -762,12 +870,20 @@ def main():
                             if time is not None:
                                 if bot_state.next == "create_timed_post_or_poll_2":
                                     create_timed_post_or_poll_2(chat_id, channel_id, time)
+                                elif bot_state.next == "delete_timed_post_3":
+                                    delete_timed_post_3(chat_id, channel_id, bot_state.params[0], time)
+                                elif bot_state.next == "pin_timed_post_3":
+                                    pin_timed_post_3(chat_id, channel_id, bot_state.params[0], time)
                         elif bot_state.state == "get_fwd":
                             mid = get_fwd(chat_id, upd)
                             if mid is not None:
                                 if bot_state.next == "get_post_statistics_2":
                                     get_post_statistics_2(chat_id, channel_id, mid, bot_state.params[0],
                                                           bot_state.params[1], bot_state.params[2])
+                                elif bot_state.next == "delete_timed_post_2":
+                                    delete_timed_post_2(chat_id, mid)
+                                elif bot_state.next == "pin_timed_post_2":
+                                    pin_timed_post_2(chat_id, mid)
                 elif upd_type == 'message_callback':
                     chat_callback(chat_id, channel_id, bot.get_callback_id(upd), bot.get_payload(upd))
                 if chat_info['type'] == 'chat':
