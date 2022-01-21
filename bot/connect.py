@@ -15,6 +15,46 @@ conn.autocommit = True
 cur = conn.cursor()
 
 
+def create_predlozka():
+    """
+    Private
+    create table predlozka
+    """
+    cur.execute(
+        "CREATE TABLE predlozka (channel_to_post_id BIGINT, "
+        "user_chat_id BIGINT, message_id varchar, time BIGINT);")
+
+
+def add_predlozenie(chat_id: int, uchat_id: int, message_id: str, timestamp: int):
+    """
+    Add to db predlozenie
+    channel to post id, chat with message to post, message id to post, time when message was sent
+    """
+    cur.execute("INSERT INTO predlozka (channel_to_post_id, user_chat_id, message_id, time) VALUES (%s, %s, %s, %s);",
+                (chat_id, uchat_id, message_id, timestamp))
+
+
+def get_predlozenya(channel_id: int):
+    """
+    give message's from predlozka for channel
+    """
+    cur.execute(f"SELECT * FROM predlozka WHERE channel_to_post_id={channel_id};")
+
+    tmp = cur.fetchone()
+    res = []
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+    return res
+
+
+def pop_one_predlozka(message_id: str):
+    """
+    Delete from predlozka by message id
+    """
+    cur.execute(f"DELETE FROM predlozka WHERE message_id={message_id}")
+
+
 def create_channel_list():
     """
     Private
@@ -444,6 +484,7 @@ def create_all():
     """
     Create all tables
     """
+    create_predlozka()
     create_poll_voted()
     create_post_stat()
     create_poll_info()
