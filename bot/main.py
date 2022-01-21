@@ -40,7 +40,7 @@ commands = [{"name": '/create_poll', "description": "Создание опрос
             {"name": '/get_channel_members_statistics', "description": "Получить статистику по подписчикам канала"},
             {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
             {"name": '/set_channel', "description": "Выбор канала для работы с ботом"},
-            {"name": '/send_timed', "description": "Отправка отложенного поста или опроса"},
+            {"name": '/setup_timed', "description": "Отправка отложенного поста или опроса"},
             {"name": '/get_channel_mentions', "description": "Получение числа упоминаний канала"},
             {"name": '/exit', "description": "Возвращает бота в исходное состояние"}]
 
@@ -97,29 +97,6 @@ def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50
         logger.error("Error connect get chat info: %s.", e)
         chat = None
     return messages
-
-
-def message_exists(channel_id, mid):
-    messages = []
-    method = 'messages'
-    params = [
-        ('access_token', token),
-        ('chat_id', channel_id),
-        ('message_ids', [mid])]
-    try:
-        response = requests.get(url + method, params)
-        if response.status_code == 200:
-            messages = response.json()
-        else:
-            logger.error("Error get chat info: {}".format(response.status_code))
-            messages = None
-    except Exception as e:
-        logger.error("Error connect get chat info: %s.", e)
-        chat = None
-    if len(messages) is not 0:
-        return True
-    else:
-        return False
 
 
 def get_all_channel_members(channel_id, marker=None):
@@ -289,9 +266,9 @@ def set_channel_1(chat_id, user_id):
 def set_channel_2(chat_id, user_id, channels, num):
     msg = "Канал был успешно установлен!"
     bot.send_message(msg, chat_id)
-    set_active_channel(user_id, channels[num-1]['chat_id'])
-    if not exists_chat(channels[num-1]['chat_id']):
-        th = Thread(target=update_channel_statistics, args=[channels[num-1]['chat_id']])
+    set_active_channel(user_id, channels[num - 1]['chat_id'])
+    if not exists_chat(channels[num - 1]['chat_id']):
+        th = Thread(target=update_channel_statistics, args=[channels[num - 1]['chat_id']])
         th.start()
     reset_state()
     return channels[num - 1]['chat_id']
@@ -421,6 +398,8 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
                 delete_timed_post_1(chat_id)
             if command[1] == "pin":
                 pin_timed_post_1(chat_id)
+            if command[1] == "unpin":
+                unpin_timed_post_1(chat_id)
 
     if len(command) == 3:
         if command[0] == "timed":
@@ -691,7 +670,7 @@ def create_timed_post(chat_id, channel_id, timeto):
 
 
 def delete_timed_post_1(chat_id):
-    msg = "Перешлите боту сообщение, которое хотите удалить" \
+    msg = "Перешлите боту сообщение, которое хотите удалить.\n" \
           "Для выхода выберите команду /exit"
     bot.send_message(msg, chat_id)
     bot_state.state = "get_fwd"
@@ -714,18 +693,17 @@ def delete_timed_post_3(chat_id, channel_id, post_id, dtm):
     if timeto < 0:
         timeto = 0
     bot.send_message("Ваш пост будет удален в указанное время", chat_id)
-    th = Thread(target=delete_post, args=(channel_id, post_id,))
+    th = Thread(target=delete_post, args=(channel_id, timeto, post_id))
     th.start()
 
 
 def delete_post(channel_id, timeto, post_id):
     time.sleep(timeto)
-    if message_exists(channel_id, post_id):
-        bot.delete_message(post_id)
+    bot.delete_message(post_id)
 
 
 def pin_timed_post_1(chat_id):
-    msg = "Перешлите боту сообщение, которое хотите закрепить" \
+    msg = "Перешлите боту сообщение, которое хотите закрепить.\n" \
           "Для выхода выберите команду /exit"
     bot.send_message(msg, chat_id)
     bot_state.state = "get_fwd"
@@ -748,22 +726,45 @@ def pin_timed_post_3(chat_id, channel_id, post_id, dtm):
     if timeto < 0:
         timeto = 0
     bot.send_message("Ваш пост будет закреплен в указанное время", chat_id)
-    th = Thread(target=pin_post, args=(channel_id, post_id,))
+    th = Thread(target=pin_post, args=(channel_id, timeto, post_id))
     th.start()
 
 
 def pin_post(channel_id, timeto, post_id):
     time.sleep(timeto)
-    if message_exists(channel_id, post_id):
-        bot.pin_message(channel_id, post_id)
+    bot.pin_message(channel_id, post_id)
+
+
+def unpin_timed_post_1(chat_id):
+    msg = "Введите дату и время, в которое закрепленный пост будет откреплен в формате ДД.ММ.ГГГГ ЧЧ:ММ, например" \
+          " 11.10.2024 16:33 \n" \
+          "Для выхода выберите команду /exit"
+    bot.send_message(msg, chat_id)
+    bot_state.state = "get_date_time"
+    bot_state.next = "unpin_timed_post_2"
+
+
+def unpin_timed_post_2(chat_id, channel_id, dtm):
+    dt_now = datetime.now().timestamp()
+    timeto = int(dtm) - int(dt_now)
+    if timeto < 0:
+        timeto = 0
+    bot.send_message("В указанное время произойдет открепление закрепленного поста", chat_id)
+    th = Thread(target=unpin_post, args=(channel_id, timeto))
+    th.start()
+
+
+def unpin_post(channel_id, timeto):
+    time.sleep(timeto)
+    bot.unpin_message(channel_id)
 
 
 def setup_timed(chat_id):
     msg = "Выберите, хотите вы создать отложенный пост/опрос, удалить пост или закрепить пост"
-    bot.send_message(msg, chat_id)
     buttons = [bot.button_callback("Создание", "setup~~create", intent='default'),
                bot.button_callback("Удаление", "setup~~delete", intent='default'),
-               bot.button_callback("Закрепление", "setup~~pin", intent='default')]
+               bot.button_callback("Закрепление", "setup~~pin", intent='default'),
+               bot.button_callback("Открепление", "setup~~unpin", intent='default')]
     bot.send_message(msg, chat_id, attachments=bot.attach_buttons(buttons))
 
 
@@ -814,8 +815,8 @@ def main():
                         clear_channel_followers_1(chat_id, channel_id)
                     elif text == "/set_channel":
                         set_channel_1(chat_id, user_id)
-                    elif text == "/send_timed":
-                        create_timed_post_or_poll_1(chat_id, channel_id)
+                    elif text == "/setup_timed":
+                        setup_timed(chat_id)
                     elif text == "/get_channel_mentions":
                         channel_mentions_info(chat_id, channel_id)
                     elif text == "/exit":
@@ -874,6 +875,8 @@ def main():
                                     delete_timed_post_3(chat_id, channel_id, bot_state.params[0], time)
                                 elif bot_state.next == "pin_timed_post_3":
                                     pin_timed_post_3(chat_id, channel_id, bot_state.params[0], time)
+                                elif bot_state.next == "unpin_timed_post_2":
+                                    unpin_timed_post_2(chat_id, channel_id, time)
                         elif bot_state.state == "get_fwd":
                             mid = get_fwd(chat_id, upd)
                             if mid is not None:
