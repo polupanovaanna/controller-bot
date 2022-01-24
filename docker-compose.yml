@@ -5,15 +5,18 @@ services:
     container_name: "controller_bot_ok"
   database:
     image: "bitnami/postgresql:13.3.0-debian-10-r47" # use latest official postgres version
-    container_name: database
+    container_name: "database"
     environment:
-      - POSTGRESQL_DATABASE=database
+      - POSSTGRES_USER=postgres
+      - POSTGRESQL_DATABASE=mydb
       - ALLOW_EMPTY_PASSWORD=yes
-      - POSTGRESQL_PASSWORD=pass
+      - POSTGRESQL_PASSWORD=123
     ports:
-        - "5432"
+      - "5432:5432"
     volumes:
       - database-data:/var/lib/postgresql/data/
+  spider:
+    build: ./spider/
+    container_name: "mention_counter"
 volumes:
   database-data:
-  

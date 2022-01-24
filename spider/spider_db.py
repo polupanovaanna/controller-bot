@@ -1,14 +1,21 @@
 import psycopg2
 import time
+from config import host, user, password, db_name
 
 cur = None
 conn = None
-table_name = "mentions_info107"
+table_name = "mentions_info"
 
 
 def connect():
     global conn, cur
-    conn = psycopg2.connect("dbname=mydb user=megaserg01 password=123")
+    time.sleep(10)
+    conn = psycopg2.connect(
+        host=host,
+        user=user,
+        password=password,
+        database=db_name
+    )
     conn.autocommit = True
     cur = conn.cursor()
 
@@ -75,7 +82,11 @@ def get_all_chats():
 
 def get_mentions(chat_id):
     cur.execute("SELECT mentions from {} where channel_id={}".format(table_name, chat_id))
-    return cur.fetchone()
+    res = cur.fetchone()
+    if res is not None:
+        return res
+    else:
+        return -1
 
 connect()
 create_spider_db()
