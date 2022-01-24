@@ -15,6 +15,46 @@ conn.autocommit = True
 cur = conn.cursor()
 
 
+def create_predlozka():
+    """
+    Private
+    create table predlozka
+    """
+    cur.execute(
+        "CREATE TABLE predlozka (channel_to_post_id BIGINT, "
+        "user_chat_id BIGINT, message_id varchar, time BIGINT);")
+
+
+def add_predlozenie(chat_id: int, uchat_id: int, message_id: str, timestamp: int):
+    """
+    Add to db predlozenie
+    channel to post id, chat with message to post, message id to post, time when message was sent
+    """
+    cur.execute("INSERT INTO predlozka (channel_to_post_id, user_chat_id, message_id, time) VALUES (%s, %s, %s, %s);",
+                (chat_id, uchat_id, message_id, timestamp))
+
+
+def get_predlozenya(channel_id: int):
+    """
+    give message's from predlozka for channel
+    """
+    cur.execute(f"SELECT * FROM predlozka WHERE channel_to_post_id={channel_id};")
+
+    tmp = cur.fetchone()
+    res = []
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+    return res
+
+
+def pop_one_predlozka(message_id: str):
+    """
+    Delete from predlozka by message id
+    """
+    cur.execute(f"DELETE FROM predlozka WHERE message_id={message_id}")
+
+
 def create_channel_list():
     """
     Private
@@ -206,6 +246,22 @@ def get_channel_stat_by_month_from_to(chat_id: int, fr=0, to=2147483647):
     You can add 'from' and 'to'.
     """
     return get_channel_stat_from_to(chat_id, 'month', fr, to)
+
+
+def get_top_from_channel(chat_id: int, cnt = 3, fr = 0, to = 2147483647):
+    """
+    give top from chat
+    u can use count of posts, from and to
+    """
+    cur.execute(
+        f"SELECT SUM(views) AS view, post_stat.message_id AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.message_id=channel_post.message_id WHERE channel_post.chat_id={chat_id} AND post_stat.time BETWEEN {fr} AND {to} GROUP BY post_stat.message_id ORDER BY view DESC LIMIT {cnt};")
+
+    tmp = cur.fetchone()
+    res = []
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+    return res
 
 
 def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
@@ -444,6 +500,7 @@ def create_all():
     """
     Create all tables
     """
+    create_predlozka()
     create_poll_voted()
     create_post_stat()
     create_poll_info()
@@ -470,9 +527,13 @@ except:
     pass
 
 if __name__ == "__main__":
-    set_active_channel(0, 0)
-    print(get_active_channel(0))
-    print(get_channel_mentions(12345))
-    set_active_channel(0, 5)
-    print(get_active_channel(0))
+    #add_post(0, 5, 0, 0)
+    #add_post(10, 10, 0, 0)
+    #add_post(20, 15, 0, 0)
+
+    #add_post(0, 4, 1, 0)
+    #add_post(10, 6, 1, 0)
+    #add_post(20, 8, 1, 0)
+
+    print(get_top_from_channel(0, 1))
     close()
