@@ -355,7 +355,8 @@ def see_suggested_posts_1(chat_id, channel_id):
     if length == 0:
         bot.send_message("Предложенных постов пока нет", chat_id)
         return
-    buttons = [bot.button_callback("Опубликовать", "publish~~" + posts[0][2], intent='default')]
+    buttons = [bot.button_callback("Опубликовать", "publish~~" + posts[0][2], intent='default'),
+               bot.button_callback("Отклонить", "decline~~" + posts[0][2], intent='default')]
     if length > 1:
         buttons.append(bot.button_callback("Вперед", "next", intent='default'))
     bot.send_message("Пост 1/" + str(length), chat_id, attachments=bot.attach_buttons(buttons))
@@ -379,6 +380,11 @@ def publish_suggested(channel_id, msg_id):
     pop_one_suggestion(msg_id)
 
 
+def decline_suggested(chat_id, msg_id):
+    pop_one_suggestion(msg_id)
+    bot.send_message("Сообщение отклонено", chat_id)
+
+
 def print_suggested(chat_id, channel_id, user_id, i, tpe):
     if tpe == "next":
         i += 1
@@ -395,6 +401,7 @@ def print_suggested(chat_id, channel_id, user_id, i, tpe):
     if i > 0:
         buttons.append(bot.button_callback("Назад", "prev", intent='default'))
     buttons.append(bot.button_callback("Опубликовать", "publish~~" + posts[i][2], intent='default'))
+    buttons.append(bot.button_callback("Отклонить", "decline~~" + posts[0][2], intent='default'))
     if i != len(posts) - 1:
         buttons.append(bot.button_callback("Вперед", "next", intent='default'))
     bot.send_message("Пост " + str(i + 1) + "/" + str(len(posts)), chat_id, attachments=bot.attach_buttons(buttons))
@@ -565,6 +572,8 @@ def chat_callback(chat_id, channel_id, user_id, callback_payload):
                 unpin_timed_post_1(chat_id, user_id)
         elif command[0] == "publish":
             publish_suggested(channel_id, command[1])
+        elif command[0] == "decline":
+            decline_suggested(chat_id, command[1])
     if len(command) == 3:
         if command[0] == "timed":
             if command[1] == "poll":
