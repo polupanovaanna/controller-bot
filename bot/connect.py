@@ -52,7 +52,7 @@ def pop_one_suggestion(message_id: str):
     """
     Delete from suggestions by message id
     """
-    cur.execute(f"DELETE FROM suggestions WHERE message_id={message_id}")
+    cur.execute(f"DELETE FROM suggestions WHERE message_id='{message_id}'")
 
 
 def create_channel_list():
@@ -526,13 +526,7 @@ try:
 except:
     pass
 if __name__ == "__main__":
-    #add_post(0, 5, 0, 0)
-    #add_post(10, 10, 0, 0)
-    #add_post(20, 15, 0, 0)
-
-    #add_post(0, 4, 1, 0)
-    #add_post(10, 6, 1, 0)
-    #add_post(20, 8, 1, 0)
-
-    print(get_top_from_channel(0, 1))
+    #add_suggestion(0, 0, '0', 0)
+    #print(get_suggestions(0))
+    #pop_one_suggestion('0')
     close()
