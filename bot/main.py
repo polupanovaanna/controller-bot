@@ -654,6 +654,8 @@ def main():
     bot.edit_bot_info("TESTbot", commands=commands)
 
     while True:
+        if exit_request:
+            break
         upd = bot.get_updates()
         if upd:
             chat_id = bot.get_chat_id(upd)
@@ -757,8 +759,9 @@ def main():
                     elif 'read_all_messages' not in bot.get_chat_membership(chat_id)['permissions']:
                         bot.send_message(ask_for_perms_text, chat_id)
 
-
+exit_request = False
 if __name__ == '__main__':
+
     try:
         # connect()
         # create_all()

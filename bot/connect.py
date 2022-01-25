@@ -4,7 +4,7 @@ import psycopg2
 from config import host, user, password, db_name
 from time import time as tm
 
-time.sleep(10)
+# time.sleep(10)
 conn = psycopg2.connect(
     host=host,
     user=user,
@@ -468,7 +468,6 @@ try:
     create_all()
 except:
     pass
-
 if __name__ == "__main__":
     set_active_channel(0, 0)
     print(get_active_channel(0))
