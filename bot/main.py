@@ -22,6 +22,7 @@ class State:
         self.state = "empty"
         self.next = "empty"
         self.params = []
+        self.cur_suggestion = 0
 
 
 bot_state = State()
@@ -97,6 +98,30 @@ def get_all_messages(channel_id, date_begin=None, date_end=None, num_of_posts=50
         logger.error("Error connect get chat info: %s.", e)
         chat = None
     return messages
+
+
+def get_message_by_id(chat_id, msg_id):
+    message = None
+    method = 'messages/{}'.format(msg_id)
+    params = [('access_token', token)]
+    try:
+        response = requests.get(url + method, params)
+        if response.status_code == 200:
+            message = response.json()
+        else:
+            logger.error("Error get chat info: {}".format(response.status_code))
+            message = None
+    except Exception as e:
+        logger.error("Error connect get chat info: %s.", e)
+        message = None
+    if message is None:
+        return None
+    ans = [message['body']['text']]
+    if 'attachments' in message['body']:
+        ans.append(message['body']['attachments'])
+    else:
+        ans.append(None)
+    return ans
 
 
 def get_all_channel_members(channel_id, marker=None):
@@ -320,7 +345,7 @@ def add_suggested_post_3(chat_id, channel_id, msg_id):
 
 
 def see_suggested_posts_1(chat_id, channel_id):
-    msg = "Ниже появится меню для "
+    msg = "Ниже появится меню для выбора "
     posts = get_suggestions(channel_id)
     # что вообще дальше происходит? Есть массив постов и индекс, между постами можно перемещаться вперед назад и
     # публиковать
@@ -328,16 +353,41 @@ def see_suggested_posts_1(chat_id, channel_id):
     if length == 0:
         bot.send_message("Предложенных постов пока нет", chat_id)
         return
-    buttons = [bot.button_callback("Опубликовать", "publish~" + posts[2], intent='default')]
+    buttons = [
+        bot.button_callback("Опубликовать", "publish~~" + posts[0][2] + "~~" + str(posts[0][1]), intent='default')]
     if length > 1:
         buttons.append(bot.button_callback("Вперед", "next", intent='default'))
-    bot.send_message("Пост 1/"+str(length), chat_id, attachments=bot.attach_buttons(buttons))
-    bot_state.params[0].append(posts)
-    bot_state.params[0].append(i)
+    bot.send_message("Пост 1/" + str(length), chat_id, attachments=bot.attach_buttons(buttons))
+    info = get_message_by_id(posts[0][1], posts[0][2])
+    bot.send_message(info[0], chat_id, attachments=info[1])
 
 
 def publish_suggested(chat_id, channel_id, msg_id):
+    info = get_message_by_id(chat_id, msg_id)
+    bot.send_message(info[0], channel_id, attachments=info[1])
+    pop_one_suggestion(msg_id)
 
+
+def print_suggested(chat_id, channel_id, i, tpe):
+    if tpe == "next":
+        i += 1
+    elif tpe == "prev":
+        i -= 1
+    posts = get_suggestions(channel_id)
+    if len(posts) == 0:
+        bot.send_message("Предложенных постов пока нет", chat_id)
+        return
+    if i >= len(posts) or i < 0:
+        i = 0
+    bot_state.cur_suggestion = i
+    buttons = []
+    if i > 0:
+        buttons.append(bot.button_callback("Назад", "prev", intent='default'))
+    buttons.append(bot.button_callback("Опубликовать", "publish~~" + posts[i][2] + "~~" + str(posts[i][1]), intent='default'))
+    if i != len(posts) - 1:
+        buttons.append(bot.button_callback("Вперед", "next", intent='default'))
+    info = get_message_by_id(posts[i][1], posts[i][2])
+    bot.send_message(info[0], chat_id, attachments=info[1])
 
 
 def update_channel_statistics(channel_id):
@@ -476,6 +526,11 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
     Обработка нажатий на кнопку, поступающих от пользователя
     """
     command = callback_payload.split("~~")
+    if len(command) == 1:
+        if command == "prev":
+            print_suggested(chat_id, channel_id, bot_state.cur_suggestion, "prev")
+        elif command == "next":
+            print_suggested(chat_id, channel_id, bot_state.cur_suggestion, "next")
     if len(command) == 2:
         if command[0] == "gcs":
             if command[1] == "channel":
@@ -491,13 +546,14 @@ def chat_callback(chat_id, channel_id, callback_id, callback_payload):
                 pin_timed_post_1(chat_id)
             if command[1] == "unpin":
                 unpin_timed_post_1(chat_id)
-
     if len(command) == 3:
         if command[0] == "timed":
             if command[1] == "poll":
                 create_poll_1(chat_id, channel_id, int(command[2]))
             else:
                 create_timed_post_1(chat_id, channel_id, int(command[2]))
+        elif command[0] == "publish":
+            publish_suggested(command[2], channel_id, command[1])
     if len(command) == 4:
         if command[0] == "gms":
             gms_get_stat(chat_id, channel_id, command[1], command[2], command[3])
