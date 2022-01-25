@@ -63,7 +63,7 @@ class TestBotMethods(unittest.TestCase):
         thread_bot_2.start()
         tester_bot_3.send_message("/set_channel", bot_chat_id_2)
         upd = tester_bot_3.get_updates()
-        self.assertEqual(tester_bot_3.get_text(upd), "Выберите канал, с которым вы ходите работать:\n1. Test_channel3")
+        self.assertEqual(tester_bot_3.get_text(upd), "Выберите канал, с которым вы ходите работать:\n1. Test_channel4\n1. Test_channel3")
         self.assertEqual(tester_bot_3.get_chat_id(upd), bot_chat_id_2)
         tester_bot_3.send_message("1", bot_chat_id_2)
         upd = tester_bot_3.get_updates()
