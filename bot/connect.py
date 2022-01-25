@@ -15,30 +15,30 @@ conn.autocommit = True
 cur = conn.cursor()
 
 
-def create_predlozka():
+def create_suggestions():
     """
     Private
-    create table predlozka
+    create table suggestions
     """
     cur.execute(
-        "CREATE TABLE predlozka (channel_to_post_id BIGINT, "
+        "CREATE TABLE suggestions (channel_to_post_id BIGINT, "
         "user_chat_id BIGINT, message_id varchar, time BIGINT);")
 
 
-def add_predlozenie(chat_id: int, uchat_id: int, message_id: str, timestamp: int):
+def add_suggestion(chat_id: int, uchat_id: int, message_id: str, timestamp: int):
     """
-    Add to db predlozenie
+    Add to db suggestions
     channel to post id, chat with message to post, message id to post, time when message was sent
     """
-    cur.execute("INSERT INTO predlozka (channel_to_post_id, user_chat_id, message_id, time) VALUES (%s, %s, %s, %s);",
+    cur.execute("INSERT INTO suggestions (channel_to_post_id, user_chat_id, message_id, time) VALUES (%s, %s, %s, %s);",
                 (chat_id, uchat_id, message_id, timestamp))
 
 
-def get_predlozenya(channel_id: int):
+def get_suggestions(channel_id: int):
     """
-    give message's from predlozka for channel
+    give message's from suggestions for channel
     """
-    cur.execute(f"SELECT * FROM predlozka WHERE channel_to_post_id={channel_id};")
+    cur.execute(f"SELECT * FROM suggestions WHERE channel_to_post_id={channel_id};")
 
     tmp = cur.fetchone()
     res = []
@@ -48,11 +48,11 @@ def get_predlozenya(channel_id: int):
     return res
 
 
-def pop_one_predlozka(message_id: str):
+def pop_one_suggestion(message_id: str):
     """
-    Delete from predlozka by message id
+    Delete from suggestions by message id
     """
-    cur.execute(f"DELETE FROM predlozka WHERE message_id={message_id}")
+    cur.execute(f"DELETE FROM suggestions WHERE message_id={message_id}")
 
 
 def create_channel_list():
@@ -500,7 +500,7 @@ def create_all():
     """
     Create all tables
     """
-    create_predlozka()
+    create_suggestions()
     create_poll_voted()
     create_post_stat()
     create_poll_info()
