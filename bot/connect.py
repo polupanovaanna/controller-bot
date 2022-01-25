@@ -15,6 +15,46 @@ conn.autocommit = True
 cur = conn.cursor()
 
 
+def create_suggestions():
+    """
+    Private
+    create table suggestions
+    """
+    cur.execute(
+        "CREATE TABLE suggestions (channel_to_post_id BIGINT, "
+        "user_chat_id BIGINT, message_id varchar, time BIGINT);")
+
+
+def add_suggestion(chat_id: int, uchat_id: int, message_id: str, timestamp: int):
+    """
+    Add to db suggestions
+    channel to post id, chat with message to post, message id to post, time when message was sent
+    """
+    cur.execute("INSERT INTO suggestions (channel_to_post_id, user_chat_id, message_id, time) VALUES (%s, %s, %s, %s);",
+                (chat_id, uchat_id, message_id, timestamp))
+
+
+def get_suggestions(channel_id: int):
+    """
+    give message's from suggestions for channel
+    """
+    cur.execute(f"SELECT * FROM suggestions WHERE channel_to_post_id={channel_id};")
+
+    tmp = cur.fetchone()
+    res = []
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+    return res
+
+
+def pop_one_suggestion(message_id: str):
+    """
+    Delete from suggestions by message id
+    """
+    cur.execute(f"DELETE FROM suggestions WHERE message_id={message_id}")
+
+
 def create_channel_list():
     """
     Private
@@ -208,6 +248,22 @@ def get_channel_stat_by_month_from_to(chat_id: int, fr=0, to=2147483647):
     return get_channel_stat_from_to(chat_id, 'month', fr, to)
 
 
+def get_top_from_channel(chat_id: int, cnt = 3, fr = 0, to = 2147483647):
+    """
+    give top from chat
+    u can use count of posts, from and to
+    """
+    cur.execute(
+        f"SELECT SUM(views) AS view, post_stat.message_id AS views_sum FROM post_stat INNER JOIN channel_post ON post_stat.message_id=channel_post.message_id WHERE channel_post.chat_id={chat_id} AND post_stat.time BETWEEN {fr} AND {to} GROUP BY post_stat.message_id ORDER BY view DESC LIMIT {cnt};")
+
+    tmp = cur.fetchone()
+    res = []
+    while tmp != None:
+        res.append(tmp)
+        tmp = cur.fetchone()
+    return res
+
+
 def get_channel_stat_from_to(chat_id: int, wtf: str, fr: int, to: int):
     """
     Private
@@ -304,7 +360,7 @@ def create_poll_info():
     """
     cur.execute(
         "CREATE TABLE poll_info (id BIGINT PRIMARY KEY NOT NULL, "
-        "poll_name varchar, answers varchar ARRAY, voted BIGINT ARRAY, closed boolean);")
+        "poll_name varchar, answers varchar ARRAY, voted BIGINT ARRAY, closed boolean, chat_id BIGINT);")
 
 
 def create_poll_voted():
@@ -366,7 +422,7 @@ def convert_poll_results(answers_):
     return answers, voted
 
 
-def add_poll(id: int, name: str, answers_):
+def add_poll(id: int, name: str, answers_, chat_id: int):
     """
     Call on create poll.
 
@@ -374,8 +430,8 @@ def add_poll(id: int, name: str, answers_):
     """
     answers, voted = convert_poll_results(answers_)
 
-    cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed) VALUES (%s, %s, %s, %s, FALSE);",
-                (id, name, answers, voted))
+    cur.execute("INSERT INTO poll_info (id, poll_name, answers, voted, closed, chat_id) VALUES (%s, %s, %s, %s, FALSE, %s);",
+                (id, name, answers, voted, chat_id))
 
 
 def update_votes(id: int, index: int, chel_id: int, name: str):
@@ -425,11 +481,11 @@ def get_poll_statistics_db(id: int):
     return list(zip(res[2], res[3]))
 
 
-def get_all_polls():
+def get_all_polls(chat_id: int):
     """
     Return [(id: int, name: str), ...]
     """
-    cur.execute(f"SELECT id, poll_name FROM poll_info WHERE closed=FALSE;")
+    cur.execute(f"SELECT id, poll_name FROM poll_info WHERE closed=FALSE AND chat_id={chat_id};")
 
     tmp = cur.fetchone()
     res = []
@@ -444,6 +500,7 @@ def create_all():
     """
     Create all tables
     """
+    create_suggestions()
     create_poll_voted()
     create_post_stat()
     create_poll_info()
@@ -469,9 +526,13 @@ try:
 except:
     pass
 if __name__ == "__main__":
-    set_active_channel(0, 0)
-    print(get_active_channel(0))
-    print(get_channel_mentions(12345))
-    set_active_channel(0, 5)
-    print(get_active_channel(0))
+    #add_post(0, 5, 0, 0)
+    #add_post(10, 10, 0, 0)
+    #add_post(20, 15, 0, 0)
+
+    #add_post(0, 4, 1, 0)
+    #add_post(10, 6, 1, 0)
+    #add_post(20, 8, 1, 0)
+
+    print(get_top_from_channel(0, 1))
     close()
