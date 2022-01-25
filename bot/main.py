@@ -36,14 +36,16 @@ def reset_state(user_id):
 
 
 commands = [{"name": '/create_poll', "description": "Создание опроса"},
-            {"name": '/poll_statistics', "description": "Результаты опроса"},
             {"name": '/close_poll', "description": "Закрытие опроса"},
+            {"name": '/poll_statistics', "description": "Результаты опроса"},
             {"name": '/get_channel_views_statistics', "description": "Получить статистику по просмотрам на постах"},
+            {"name": '/get_posts_top', "description": "Топ постов в канале по просмотрам"},
             {"name": '/get_channel_members_statistics', "description": "Получить статистику по подписчикам канала"},
             {"name": '/clear_members', "description": "Удалить неактивных участников канала"},
             {"name": '/set_channel', "description": "Выбор канала для работы с ботом"},
-            {"name": '/setup_timed', "description": "Отправка отложенного поста или опроса"},
             {"name": '/get_channel_mentions', "description": "Получение числа упоминаний канала"},
+            {"name": '/setup_timed', "description": "Отправка отложенного поста или опроса"},
+            {"name": '/see_suggestions', "description": "Просмотр предложенных постов"},
             {"name": '/exit', "description": "Возвращает бота в исходное состояние"}]
 
 
@@ -353,18 +355,27 @@ def see_suggested_posts_1(chat_id, channel_id):
     if length == 0:
         bot.send_message("Предложенных постов пока нет", chat_id)
         return
-    buttons = [
-        bot.button_callback("Опубликовать", "publish~~" + posts[0][2], intent='default')]
+    buttons = [bot.button_callback("Опубликовать", "publish~~" + posts[0][2], intent='default')]
     if length > 1:
         buttons.append(bot.button_callback("Вперед", "next", intent='default'))
     bot.send_message("Пост 1/" + str(length), chat_id, attachments=bot.attach_buttons(buttons))
     info = get_message_by_id(posts[0][2])
-    bot.send_message(info[0], chat_id, attachments=info[1])
+    if info[1] is None:
+        bot.send_message(info[0], chat_id)
+    elif info[0] is None:
+        bot.send_message("", chat_id, attachments=info[1])
+    else:
+        bot.send_message(info[0], chat_id, attachments=info[1])
 
 
 def publish_suggested(channel_id, msg_id):
     info = get_message_by_id(msg_id)
-    bot.send_message(info[0], channel_id, attachments=info[1])
+    if info[1] is None:
+        bot.send_message(info[0], channel_id)
+    elif info[0] == '':
+        bot.send_message(None, channel_id, attachments=info[1])
+    else:
+        bot.send_message(info[0], channel_id, attachments=info[1])
     pop_one_suggestion(msg_id)
 
 
@@ -383,12 +394,17 @@ def print_suggested(chat_id, channel_id, user_id, i, tpe):
     buttons = []
     if i > 0:
         buttons.append(bot.button_callback("Назад", "prev", intent='default'))
-    buttons.append(
-        bot.button_callback("Опубликовать", "publish~~" + posts[i][2], intent='default'))
+    buttons.append(bot.button_callback("Опубликовать", "publish~~" + posts[i][2], intent='default'))
     if i != len(posts) - 1:
         buttons.append(bot.button_callback("Вперед", "next", intent='default'))
+    bot.send_message("Пост " + str(i + 1) + "/" + str(len(posts)), chat_id, attachments=bot.attach_buttons(buttons))
     info = get_message_by_id(posts[i][2])
-    bot.send_message(info[0], chat_id, attachments=info[1])
+    if info[1] is None:
+        bot.send_message(info[0], chat_id)
+    elif info[0] is None:
+        bot.send_message("", chat_id, attachments=info[1])
+    else:
+        bot.send_message(info[0], chat_id, attachments=info[1])
 
 
 def update_channel_statistics(channel_id):
@@ -528,9 +544,9 @@ def chat_callback(chat_id, channel_id, user_id, callback_payload):
     """
     command = callback_payload.split("~~")
     if len(command) == 1:
-        if command == "prev":
+        if command[0] == "prev":
             print_suggested(chat_id, channel_id, user_id, user_states[user_id].cur_suggestion, "prev")
-        elif command == "next":
+        elif command[0] == "next":
             print_suggested(chat_id, channel_id, user_id, user_states[user_id].cur_suggestion, "next")
     if len(command) == 2:
         if command[0] == "gcs":
@@ -952,17 +968,15 @@ def main():
                     text = bot.get_text(upd)
                     if text == "/set_channel":
                         set_channel_1(chat_id, user_id)
-                        if channel_id != -1:
-                            bot.send_message(greeting_text_1, chat_id)
                     elif text == "/suggest":
                         add_suggested_post_1(chat_id, user_id)
                     elif channel_id == -1 and user_states[user_id].next != "set_channel_2" and \
-                            user_states[user_id].next != "add_suggested_post_2" and user_states[
-                        user_id].next != "add_suggested_post_3":
+                            user_states[user_id].next != "add_suggested_post_2" \
+                            and user_states[user_id].next != "add_suggested_post_3":
                         bot.send_message("Пожалуйста, установите канал для работы с ботом", chat_id)
                         continue
                     elif text == "/create_poll":
-                        create_poll_1(chat_id, channel_id, user_id)
+                        create_poll_1(chat_id, user_id)
                     elif text == "/close_poll":
                         close_poll_1(chat_id, channel_id, user_id)
                     elif text == "/poll_statistics":
@@ -992,6 +1006,9 @@ def main():
                                 ans = get_integer(chat_id, user_id, user_states[user_id].params[0], upd)
                                 if ans is not None:
                                     set_channel_2(chat_id, user_id, user_states[user_id].params[1], ans)
+                                    channel_id = get_active_channel(user_id)
+                                    if channel_id != -1:
+                                        bot.send_message(greeting_text_1, chat_id)
                                     reset_state(user_id)
                             elif user_states[user_id].next == "create_poll_3":
                                 ans = get_integer(chat_id, user_id, 100000, upd)
@@ -1078,7 +1095,7 @@ def main():
                             if user_states[user_id].next == "add_suggested_post_3":
                                 add_suggested_post_3(chat_id, user_states[user_id].params[0], msg_id, user_id)
                 elif upd_type == 'message_callback':
-                    chat_callback(chat_id, user_id, bot.get_callback_id(upd), bot.get_payload(upd))
+                    chat_callback(chat_id, channel_id, user_id, bot.get_payload(upd))
                 if chat_info['type'] == 'chat':
                     if bot.get_chat_membership(chat_id)['is_admin'] is False:
                         bot.send_message(ask_for_perms_text, chat_id)
